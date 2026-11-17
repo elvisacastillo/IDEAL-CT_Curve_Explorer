@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en" data-ui="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IDEAL-CT Curve Explorer</title>
+<meta name="description" content="Interactive web application to explore, fit and interpret IDEAL-CT (ASTM D8225) load–displacement curves and the cracking tolerance index CT-index. Author: Dr. Elvis A. Castillo-Camarena, Universidad Tecnológica de Panamá (UTP).">
+<meta name="author" content="Elvis A. Castillo-Camarena">
+<meta property="og:title" content="IDEAL-CT Curve Explorer">
+<meta property="og:description" content="Explore, fit and interpret IDEAL-CT load–displacement curves and the cracking tolerance index (CT-index) in your browser.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232B6CB0'/%3E%3Cpath d='M5 26 C9 6 13 6 16 9 S22 22 27 25' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round'/%3E%3Ccircle cx='13.5' cy='7.6' r='2.6' fill='%23FC8181'/%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script>
+  // Pick the interface language before first paint: saved choice, else browser language.
+  (function () {
+    var lang = null;
+    try { lang = localStorage.getItem("ctx-lang"); } catch (e) {}
+    if (lang !== "en" && lang !== "es") {
+      lang = (navigator.language || "").toLowerCase().indexOf("es") === 0 ? "es" : "en";
+    }
+    document.documentElement.setAttribute("data-ui", lang);
+    document.documentElement.setAttribute("lang", lang);
+  })();
+</script>
+<style>
+  :root {
+    --bg: #FAFAFA;
+    --panel: #FFFFFF;
+    --ink: #1A202C;
+    --label: #4A5568;
+    --muted: #718096;
+    --faint: #A0AEC0;
+    --border: #CBD5E0;
+    --hair: #E2E8F0;
+    --curve: #2B6CB0;
+    --curve-deep: #1E4E8C;
+    --fill: rgba(190, 227, 248, 0.55);
+    --peak: #E53E3E;
+    --rise: #2F855A;
+    --decay: #805AD5;
+    --target: #DD6B20;
+    --astm: #C05621;
+    --tint: #EBF8FF;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  html[data-ui="en"] [data-lang="es"],
+  html[data-ui="es"] [data-lang="en"] { display: none !important; }
+
+  a { color: var(--curve); }
+  sub { font-size: 0.72em; line-height: 0; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 28px; }
+
+  /* ── Top bar ───────────────────────────────────────────── */
+  .topbar {
+    border-bottom: 1px solid var(--hair);
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: saturate(1.4) blur(6px);
+    -webkit-backdrop-filter: saturate(1.4) blur(6px);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .topbar .wrap {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; height: 58px;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 600; font-size: 16px; color: var(--ink); text-decoration: none;
+    white-space: nowrap;
+  }
+  .brand svg { width: 26px; height: 26px; flex: none; }
+  .nav { display: flex; align-items: center; gap: 18px; font-size: 15px; }
+  .nav a.navlink { color: var(--label); text-decoration: none; }
+  .nav a.navlink:hover { color: var(--curve); }
+  .lang {
+    display: inline-flex; border: 1px solid var(--border); border-radius: 999px;
+    overflow: hidden; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  }
+  .lang button {
+    border: 0; background: transparent; color: var(--label);
+    padding: 5px 10px; cursor: pointer; font: inherit; letter-spacing: 0.04em;
+  }
+  .lang button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  /* ── Hero ─────────────────────────────────────────────── */
+  .hero { padding: 64px 0 56px; }
+  .hero .wrap {
+    display: grid; grid-template-columns: 1.02fr 1fr; gap: 56px; align-items: center;
+  }
+  .eyebrow {
+    font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--rise);
+    margin: 0 0 14px;
+  }
+  h1 {
+    font-size: clamp(36px, 5.2vw, 56px); line-height: 1.04; font-weight: 700;
+    letter-spacing: -0.015em; margin: 0 0 20px; text-wrap: balance;
+  }
+  h1 .accent { color: var(--curve); }
+  .lead { font-size: 19.5px; color: var(--label); margin: 0 0 26px; max-width: 34em; text-wrap: pretty; }
+  .byline {
+    display: flex; gap: 12px; align-items: center;
+    padding: 12px 0; margin: 0 0 28px;
+    border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair);
+    font-size: 15px; color: var(--label); line-height: 1.4;
+  }
+  .byline .who { color: var(--ink); font-weight: 600; font-size: 16.5px; }
+  .avatar {
+    width: 42px; height: 42px; border-radius: 50%; flex: none;
+    background: var(--ink); color: #fff; display: grid; place-items: center;
+    font-weight: 600; font-size: 15px; letter-spacing: 0.02em;
+  }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: 12px 22px; border-radius: 8px; font-size: 16.5px; font-weight: 600;
+    text-decoration: none; border: 1px solid transparent; cursor: pointer;
+    font-family: inherit; transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+  }
+  .btn.primary { background: var(--curve); color: #fff; box-shadow: 0 1px 0 rgba(0,0,0,0.08), 0 6px 16px -6px rgba(43,108,176,0.55); }
+  .btn.primary:hover { background: var(--curve-deep); transform: translateY(-1px); }
+  .btn.ghost { background: var(--panel); color: var(--ink); border-color: var(--border); }
+  .btn.ghost:hover { border-color: var(--curve); color: var(--curve); }
+  .btn svg { width: 18px; height: 18px; }
+  .trust {
+    display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 20px 0 0; padding: 0;
+    list-style: none; font-size: 14px; color: var(--muted);
+  }
+  .trust li { display: inline-flex; align-items: center; gap: 7px; }
+  .trust li::before {
+    content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--rise);
+  }
+
+  .figure {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 14px 10px; box-shadow: 0 18px 40px -24px rgba(26,32,44,0.35);
+  }
+  .figure svg { display: block; width: 100%; height: auto; }
+  .fig-legend {
+    display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 8px 6px 2px;
+    border-top: 1px dashed var(--hair); margin-top: 6px;
+    font-size: 13px; color: var(--label);
+  }
+  .sw {
+    display: inline-block; width: 11px; height: 11px; border-radius: 50%;
+    border: 1.5px solid #fff; box-shadow: 0 0 0 1px var(--border);
+    vertical-align: -1px; margin-right: 6px;
+  }
+  .sw.peak { background: var(--peak); }
+  .sw.rise { background: var(--rise); }
+  .sw.decay { background: var(--decay); }
+  .halo { transform-box: fill-box; transform-origin: center; animation: pulse 2.6s ease-in-out infinite; }
+  .halo.h2 { animation-delay: 0.45s; }
+  .halo.h3 { animation-delay: 0.9s; }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 0.22; }
+    50% { transform: scale(1.35); opacity: 0.08; }
+  }
+  @media (prefers-reduced-motion: reduce) { .halo { animation: none; } }
+
+  /* ── Sections ─────────────────────────────────────────── */
+  section.block { padding: 64px 0; border-top: 1px solid var(--hair); }
+  section.block.alt { background: var(--panel); }
+  .kicker {
+    font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px;
+  }
+  h2 { font-size: clamp(27px, 3.2vw, 34px); line-height: 1.15; margin: 0 0 18px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+  .prose { max-width: 46em; }
+  .prose p { margin: 0 0 16px; }
+  .prose em { color: var(--label); }
+
+  .uses { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 30px; }
+  .use {
+    border-left: 3px solid var(--curve); padding: 4px 0 4px 16px;
+  }
+  .use:nth-child(2) { border-color: var(--rise); }
+  .use:nth-child(3) { border-color: var(--decay); }
+  .use h3 { margin: 0 0 4px; font-size: 18px; }
+  .use p { margin: 0; color: var(--label); font-size: 16px; }
+
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 28px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 22px 22px 20px; position: relative;
+  }
+  section.alt .card { background: var(--bg); }
+  .card .ic {
+    width: 40px; height: 40px; border-radius: 9px; display: grid; place-items: center;
+    background: var(--tint); color: var(--curve); margin-bottom: 14px;
+  }
+  .card .ic svg { width: 22px; height: 22px; }
+  .card h3 { margin: 0 0 6px; font-size: 18.5px; line-height: 1.3; }
+  .card p { margin: 0; color: var(--label); font-size: 15.5px; line-height: 1.55; }
+  .ic.red { background: #FFF5F5; color: var(--peak); }
+  .ic.green { background: #F0FFF4; color: var(--rise); }
+  .ic.purple { background: #FAF5FF; color: var(--decay); }
+  .ic.orange { background: #FFFAF0; color: var(--astm); }
+  .ic.ink { background: #EDF2F7; color: var(--label); }
+
+  .steps { list-style: none; padding: 0; margin: 28px 0 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; counter-reset: s; }
+  .steps li {
+    counter-increment: s; background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px 18px 18px; font-size: 15.5px; color: var(--label);
+  }
+  .steps li::before {
+    content: counter(s); display: grid; place-items: center;
+    width: 30px; height: 30px; border-radius: 50%; margin-bottom: 10px;
+    background: var(--ink); color: #fff; font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; font-weight: 700;
+  }
+  .steps b { color: var(--ink); }
+  .steps .ui {
+    font-family: 'JetBrains Mono', monospace; font-size: 12.5px; white-space: nowrap;
+    background: #EDF2F7; border: 1px solid var(--hair); border-radius: 4px; padding: 1px 6px; color: var(--ink);
+  }
+  .tips { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+  .tip {
+    border-radius: var(--radius); padding: 16px 18px; font-size: 15.5px; color: var(--label);
+    background: #F7FAFC; border: 1px dashed var(--border);
+  }
+  .tip.note { background: #FFFAF0; border: 1px solid #FBD38D; }
+  .tip b { color: var(--ink); }
+
+  .credit { display: grid; grid-template-columns: 0.85fr 1.15fr; gap: 22px; margin-top: 28px; }
+  .author-card { display: flex; gap: 18px; align-items: flex-start; }
+  .author-card .avatar { width: 64px; height: 64px; font-size: 22px; }
+  .author-card .name { font-size: 21px; font-weight: 700; margin: 2px 0 4px; line-height: 1.25; }
+  .author-card .aff { color: var(--label); font-size: 15.5px; line-height: 1.5; margin: 0; }
+  .role { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .license p { margin: 0 0 12px; color: var(--label); font-size: 15.5px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px; font-weight: 700; border: 1px solid var(--ink); border-radius: 999px;
+    padding: 3px 11px; color: var(--ink); text-decoration: none; margin-bottom: 12px;
+  }
+  .badge:hover { background: var(--ink); color: #fff; }
+  .cite {
+    display: flex; gap: 10px; align-items: stretch; margin-top: 4px;
+  }
+  .cite code {
+    flex: 1; display: block; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.55;
+    background: #1A202C; color: #E2E8F0; border-radius: 8px; padding: 12px 14px; white-space: normal;
+  }
+  .copy {
+    flex: none; border: 1px solid var(--border); background: var(--panel); border-radius: 8px;
+    padding: 0 14px; font-family: inherit; font-size: 14px; cursor: pointer; color: var(--label);
+  }
+  .copy:hover { border-color: var(--curve); color: var(--curve); }
+
+  footer.site {
+    border-top: 1px solid var(--hair); padding: 26px 0 34px; font-size: 14px; color: var(--muted);
+  }
+  footer.site .wrap { display: flex; flex-wrap: wrap; gap: 8px 22px; justify-content: space-between; }
+  footer.site a { color: var(--label); }
+
+  /* ── Responsive ───────────────────────────────────────── */
+  @media (max-width: 960px) {
+    .hero .wrap { grid-template-columns: 1fr; gap: 36px; }
+    .features { grid-template-columns: 1fr 1fr; }
+    .steps { grid-template-columns: 1fr 1fr; }
+    .credit { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    body { font-size: 16px; }
+    .wrap { padding: 0 16px; }
+    .hero { padding: 40px 0 44px; }
+    .lead { font-size: 18px; }
+    section.block { padding: 48px 0; }
+    .uses, .features, .steps, .tips { grid-template-columns: 1fr; }
+    .nav a.navlink.hide-sm { display: none; }
+    .brand span { display: none; }
+    .cite { flex-direction: column; }
+    .copy { padding: 9px 14px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═════════════ Top bar ═════════════ -->
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="IDEAL-CT Curve Explorer">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#2B6CB0"/><path d="M5 26 C9 6 13 6 16 9 S22 22 27 25" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="13.5" cy="7.6" r="2.6" fill="#FC8181"/></svg>
+      <span>IDEAL-CT Curve Explorer</span>
+    </a>
+    <nav class="nav">
+      <a class="navlink hide-sm" href="#features"><span data-lang="en">Features</span><span data-lang="es">Funciones</span></a>
+      <a class="navlink hide-sm" href="#start"><span data-lang="en">Quick start</span><span data-lang="es">Guía rápida</span></a>
+      <a class="navlink" href="index_interactive.html"><span data-lang="en">Open app</span><span data-lang="es">Abrir app</span></a>
+      <div class="lang" role="group" aria-label="Language / Idioma">
+        <button type="button" data-set-lang="en" aria-pressed="false">EN</button>
+        <button type="button" data-set-lang="es" aria-pressed="false">ES</button>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ═════════════ Hero ═════════════ -->
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <p class="eyebrow">
+        <span data-lang="en">ASTM D8225 · Asphalt cracking · Interactive tool</span>
+        <span data-lang="es">ASTM D8225 · Agrietamiento de mezclas asfálticas · Herramienta interactiva</span>
+      </p>
+      <h1>IDEAL-CT <span class="accent">Curve Explorer</span></h1>
+      <p class="lead" data-lang="en">
+        An interactive web application to explore, fit and interpret IDEAL-CT
+        load–displacement curves — and to see, in real time, how each feature of the
+        curve drives the cracking tolerance index, CT<sub>index</sub>.
+      </p>
+      <p class="lead" data-lang="es">
+        Aplicación web interactiva para explorar, ajustar e interpretar curvas
+        carga–desplazamiento del ensayo IDEAL-CT, y ver en tiempo real cómo cada rasgo
+        de la curva determina el índice de tolerancia al agrietamiento, CT<sub>index</sub>.
+      </p>
+
+      <div class="byline">
+        <div class="avatar" aria-hidden="true">EC</div>
+        <div>
+          <div><span data-lang="en">Developed by</span><span data-lang="es">Desarrollada por</span>
+            <span class="who">Dr. Elvis A. Castillo-Camarena</span></div>
+          <div>Universidad Tecnológica de Panamá (UTP) · <span data-lang="en">School of Civil Engineering</span><span data-lang="es">Facultad de Ingeniería Civil</span></div>
+        </div>
+      </div>
+
+      <div class="cta">
+        <a class="btn primary" href="index_interactive.html">
+          <span data-lang="en">Open the app</span><span data-lang="es">Abrir la aplicación</span>
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h12M11 5l5 5-5 5"/></svg>
+        </a>
+        <a class="btn ghost" href="#start">
+          <span data-lang="en">Quick start</span><span data-lang="es">Guía rápida</span>
+        </a>
+      </div>
+      <ul class="trust">
+        <li><span data-lang="en">Runs in your browser</span><span data-lang="es">Funciona en el navegador</span></li>
+        <li><span data-lang="en">No installation</span><span data-lang="es">Sin instalación</span></li>
+        <li><span data-lang="en">Your files stay on your computer</span><span data-lang="es">Tus archivos no salen de tu computadora</span></li>
+      </ul>
+    </div>
+
+    <!-- Illustrative curve (default state of the app) -->
+    <figure class="figure" style="margin:0">
+      <svg viewBox="0 0 520 340" role="img" aria-labelledby="fig-t">
+        <title id="fig-t">Illustrative IDEAL-CT load–displacement curve with the peak, rise and decay markers used in the app</title>
+        <g stroke="#E2E8F0" stroke-width="1">
+          <line x1="161" y1="24" x2="161" y2="296"/><line x1="274" y1="24" x2="274" y2="296"/>
+          <line x1="387" y1="24" x2="387" y2="296"/><line x1="500" y1="24" x2="500" y2="296"/>
+          <line x1="48" y1="205.3" x2="500" y2="205.3"/><line x1="48" y1="114.7" x2="500" y2="114.7"/>
+          <line x1="48" y1="24" x2="500" y2="24"/>
+        </g>
+        <g stroke="#555" stroke-width="1"><line x1="48" y1="296" x2="500" y2="296"/><line x1="48" y1="24" x2="48" y2="296"/></g>
+        <g font-family="Source Serif 4, Georgia, serif" font-size="12" fill="#4A5568">
+          <g text-anchor="middle">
+            <text x="48" y="313">0</text><text x="161" y="313">5</text><text x="274" y="313">10</text>
+            <text x="387" y="313">15</text><text x="500" y="313">20</text>
+          </g>
+          <g text-anchor="end">
+            <text x="40" y="300">0</text><text x="40" y="209">4</text><text x="40" y="119">8</text><text x="40" y="28">12</text>
+          </g>
+          <text x="274" y="334" text-anchor="middle" data-lang="en">Displacement (mm)</text>
+          <text x="274" y="334" text-anchor="middle" data-lang="es">Desplazamiento (mm)</text>
+          <text transform="translate(13 160) rotate(-90)" text-anchor="middle" data-lang="en">Load (kN)</text>
+          <text transform="translate(13 160) rotate(-90)" text-anchor="middle" data-lang="es">Carga (kN)</text>
+        </g>
+        <!-- reference lines -->
+        <line x1="48" y1="126" x2="500" y2="126" stroke="#805AD5" stroke-width="1" stroke-dasharray="5 4" opacity="0.5"/>
+        <line x1="138.4" y1="69.3" x2="138.4" y2="296" stroke="#E53E3E" stroke-width="1" stroke-dasharray="5 4" opacity="0.45"/>
+        <line x1="195.9" y1="126" x2="195.9" y2="296" stroke="#805AD5" stroke-width="1" stroke-dasharray="5 4" opacity="0.5"/>
+        <line x1="89.3" y1="126" x2="89.3" y2="296" stroke="#2F855A" stroke-width="1" stroke-dasharray="5 4" opacity="0.5"/>
+        <!-- fracture work + model curve -->
+        <path fill="rgba(190,227,248,0.55)" stroke="#2B6CB0" stroke-width="2.6" stroke-linejoin="round" d="M 48.0,296.0 50.3,287.3 52.5,276.5 54.8,265.3 57.0,253.9 59.3,242.6 61.6,231.5 63.8,220.7 66.1,210.2 68.3,200.1 70.6,190.4 72.9,181.1 75.1,172.2 77.4,163.7 79.6,155.7 81.9,148.1 84.2,140.9 86.4,134.1 88.7,127.8 90.9,121.8 93.2,116.2 95.5,111.0 97.7,106.2 100.0,101.7 102.2,97.6 104.5,93.8 106.8,90.3 109.0,87.1 111.3,84.2 113.5,81.7 115.8,79.4 118.1,77.3 120.3,75.5 122.6,74.0 124.8,72.7 127.1,71.6 129.4,70.8 131.6,70.1 133.9,69.7 136.1,69.4 138.4,69.3 140.7,69.5 142.9,69.9 145.2,70.5 147.4,71.4 149.7,72.6 152.0,73.9 154.2,75.5 156.5,77.2 158.7,79.1 161.0,81.2 163.3,83.4 165.5,85.8 167.8,88.3 170.0,90.9 172.3,93.6 174.6,96.4 176.8,99.3 179.1,102.2 181.3,105.3 183.6,108.4 185.9,111.5 188.1,114.7 190.4,118.0 192.6,121.2 194.9,124.5 197.2,127.8 199.4,131.1 201.7,134.5 203.9,137.8 206.2,141.1 208.5,144.4 210.7,147.7 213.0,151.0 215.2,154.3 217.5,157.5 219.8,160.7 222.0,163.9 224.3,167.1 226.5,170.2 228.8,173.3 231.1,176.3 233.3,179.4 235.6,182.3 237.8,185.2 240.1,188.1 242.4,191.0 244.6,193.7 246.9,196.5 249.1,199.2 251.4,201.8 253.7,204.4 255.9,206.9 258.2,209.4 260.4,211.9 262.7,214.3 265.0,216.6 267.2,218.9 269.5,221.1 271.7,223.3 274.0,225.5 279.6,230.6 285.3,235.4 290.9,240.0 296.6,244.2 302.2,248.2 307.9,251.9 313.6,255.4 319.2,258.6 324.9,261.6 330.5,264.4 336.1,267.0 341.8,269.4 347.4,271.6 353.1,273.7 358.8,275.6 364.4,277.3 370.1,278.9 375.7,280.4 381.4,281.7 387.0,283.0 392.6,284.1 398.3,285.2 403.9,286.1 409.6,287.0 415.2,287.8 420.9,288.6 426.6,289.2 432.2,289.8 437.9,290.4 443.5,290.9 449.1,291.4 454.8,291.8 460.4,292.2 466.1,292.6 471.8,292.9 477.4,293.2 483.1,293.4 488.7,293.7 494.4,293.9 500.0,294.1"/>
+        <!-- drag handles -->
+        <circle class="halo" cx="138.4" cy="69.3" r="11" fill="#E53E3E" opacity="0.22"/>
+        <circle class="halo h2" cx="89.3" cy="126" r="11" fill="#2F855A" opacity="0.22"/>
+        <circle class="halo h3" cx="195.9" cy="126" r="11" fill="#805AD5" opacity="0.22"/>
+        <circle cx="138.4" cy="69.3" r="5.5" fill="#E53E3E" stroke="#fff" stroke-width="1.8"/>
+        <circle cx="89.3" cy="126" r="5.5" fill="#2F855A" stroke="#fff" stroke-width="1.8"/>
+        <circle cx="195.9" cy="126" r="5.5" fill="#805AD5" stroke="#fff" stroke-width="1.8"/>
+        <!-- results box, as shown by the app -->
+        <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="11.5">
+          <rect x="336" y="36" width="152" height="112" rx="6" fill="rgba(255,255,255,0.95)" stroke="#CBD5E0"/>
+          <g fill="#718096">
+            <text x="348" y="56">P</text><text x="348" y="74">l75</text><text x="348" y="92">|m75|</text>
+            <text x="348" y="110">Gf</text><text x="348" y="134" fill="#1A202C" font-weight="700">CT</text>
+          </g>
+          <g fill="#1A202C" text-anchor="end">
+            <text x="478" y="56">10.0 kN</text><text x="478" y="74">6.54 mm</text><text x="478" y="92">1.458 kN/mm</text>
+            <text x="478" y="110">8307 J/m²</text><text x="478" y="134" font-weight="700" fill="#2B6CB0">248.58</text>
+          </g>
+          <line x1="348" y1="119" x2="478" y2="119" stroke="#E2E8F0" stroke-dasharray="3 3"/>
+        </g>
+      </svg>
+      <figcaption class="fig-legend">
+        <span><span class="sw peak"></span><span data-lang="en">Peak (d, P)</span><span data-lang="es">Pico (d, P)</span></span>
+        <span><span class="sw rise"></span><span data-lang="en">Rise at 0.75·P</span><span data-lang="es">Ascenso a 0.75·P</span></span>
+        <span><span class="sw decay"></span><span data-lang="en">Decay at 0.75·P</span><span data-lang="es">Descenso a 0.75·P</span></span>
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ═════════════ Why ═════════════ -->
+<section class="block alt" id="why">
+  <div class="wrap">
+    <p class="kicker"><span data-lang="en">Why use it</span><span data-lang="es">Utilidad</span></p>
+    <h2 data-lang="en">Ask “what if?” of an IDEAL-CT curve</h2>
+    <h2 data-lang="es">Hazle preguntas de “¿qué pasaría si…?” a una curva IDEAL-CT</h2>
+    <div class="prose">
+      <p data-lang="en">
+        The IDEAL-CT test produces a load–displacement curve from which ASTM D8225 computes
+        the CT<sub>index</sub>, a widely used indicator of the cracking resistance of asphalt
+        mixtures. The standard procedure is ideal for routine acceptance, but it works on
+        discrete data points and cannot answer questions such as <em>how would
+        CT<sub>index</sub> change if the peak load were 10% higher, or if the drop after the
+        peak were gentler?</em>
+      </p>
+      <p data-lang="en">
+        The Curve Explorer represents the whole curve with a smooth shape controlled by four
+        parameters with direct engineering meaning — <b>peak load</b>, <b>displacement at
+        peak</b>, and how steep the <b>rise</b> before the peak and the <b>decay</b> after
+        it are — and recalculates every ASTM D8225 quantity instantly as you change them.
+      </p>
+      <p data-lang="es">
+        El ensayo IDEAL-CT produce una curva carga–desplazamiento a partir de la cual la
+        norma ASTM D8225 calcula el CT<sub>index</sub>, un indicador ampliamente usado de la
+        resistencia al agrietamiento de las mezclas asfálticas. El procedimiento estándar es
+        ideal para la aceptación rutinaria, pero trabaja sobre puntos discretos y no responde
+        preguntas como <em>¿cuánto cambiaría el CT<sub>index</sub> si la carga pico fuera un
+        10% mayor, o si la caída después del pico fuera más suave?</em>
+      </p>
+      <p data-lang="es">
+        El Curve Explorer representa la curva completa con una forma suave controlada por
+        cuatro parámetros con significado ingenieril directo —<b>carga pico</b>,
+        <b>desplazamiento en el pico</b> y qué tan pronunciados son el <b>ascenso</b> antes
+        del pico y el <b>descenso</b> después de él— y recalcula al instante todas las
+        cantidades de la ASTM D8225 a medida que los modificas.
+      </p>
+    </div>
+    <div class="uses">
+      <div class="use">
+        <h3><span data-lang="en">Teaching</span><span data-lang="es">Docencia</span></h3>
+        <p data-lang="en">Show students, live, how each part of the curve affects CT<sub>index</sub>.</p>
+        <p data-lang="es">Muestra en vivo a los estudiantes cómo cada parte de la curva afecta el CT<sub>index</sub>.</p>
+      </div>
+      <div class="use">
+        <h3><span data-lang="en">Laboratory analysis</span><span data-lang="es">Análisis de laboratorio</span></h3>
+        <p data-lang="en">Fit your test records and compare them with the standard ASTM D8225 calculation.</p>
+        <p data-lang="es">Ajusta tus registros de ensayo y compáralos con el cálculo estándar de la ASTM D8225.</p>
+      </div>
+      <div class="use">
+        <h3><span data-lang="en">Mix screening</span><span data-lang="es">Evaluación de mezclas</span></h3>
+        <p data-lang="en">Run quick sensitivity checks to see which feature of the curve most improves cracking tolerance.</p>
+        <p data-lang="es">Haz análisis rápidos de sensibilidad para ver qué rasgo de la curva mejora más la tolerancia al agrietamiento.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════ Features ═════════════ -->
+<section class="block" id="features">
+  <div class="wrap">
+    <p class="kicker"><span data-lang="en">Features</span><span data-lang="es">Funciones</span></p>
+    <h2 data-lang="en">What you can do</h2>
+    <h2 data-lang="es">Qué puedes hacer</h2>
+    <div class="features">
+      <article class="card">
+        <div class="ic red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5M10 4l2-2 2 2M10 20l2 2 2-2M4 10l-2 2 2 2M20 10l2 2-2 2"/></svg></div>
+        <h3><span data-lang="en">Shape the curve by dragging</span><span data-lang="es">Modela la curva arrastrando</span></h3>
+        <p data-lang="en">Drag the peak (red), the rise marker (green) or the decay marker (purple) directly on the curve, or use the sliders. P<sub>75</sub>, l<sub>75</sub>, |m<sub>75</sub>|, W<sub>f</sub>, G<sub>f</sub> and CT<sub>index</sub> update as you move.</p>
+        <p data-lang="es">Arrastra el pico (rojo), el marcador de ascenso (verde) o el de descenso (morado) directamente sobre la curva, o usa los deslizadores. P<sub>75</sub>, l<sub>75</sub>, |m<sub>75</sub>|, W<sub>f</sub>, G<sub>f</sub> y CT<sub>index</sub> se actualizan mientras te mueves.</p>
+      </article>
+      <article class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></div>
+        <h3><span data-lang="en">Import and fit your data</span><span data-lang="es">Importa y ajusta tus datos</span></h3>
+        <p data-lang="en">Load a test record from .xlsx, .xls or .csv, choose the sheet and the load and displacement columns, and press <b>Optimize</b> to fit the curve to your data automatically.</p>
+        <p data-lang="es">Carga el registro de un ensayo desde .xlsx, .xls o .csv, elige la hoja y las columnas de carga y desplazamiento, y presiona <b>Optimize</b> para ajustar la curva a tus datos automáticamente.</p>
+      </article>
+      <article class="card">
+        <div class="ic orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></div>
+        <h3><span data-lang="en">Side by side with ASTM D8225</span><span data-lang="es">Comparación con la ASTM D8225</span></h3>
+        <p data-lang="en">With data loaded, the standard ASTM D8225 parameters are also computed directly from the raw record, so both results can be compared at a glance.</p>
+        <p data-lang="es">Con datos cargados, también se calculan los parámetros estándar de la ASTM D8225 directamente del registro original, para comparar ambos resultados de un vistazo.</p>
+      </article>
+      <article class="card">
+        <div class="ic purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><circle cx="8" cy="15" r="1.2"/><circle cx="11" cy="12" r="1.2"/><circle cx="14.5" cy="10" r="1.2"/><circle cx="19" cy="6" r="2"/></svg></div>
+        <h3><span data-lang="en">Parameter-space view</span><span data-lang="es">Espacio de parámetros</span></h3>
+        <p data-lang="en">Plot any pair of P, d, P<sub>75</sub>, l<sub>75</sub>, |m<sub>75</sub>|, W<sub>f</sub>, G<sub>f</sub> and CT<sub>index</sub>, and watch the trail traced as you reshape the curve.</p>
+        <p data-lang="es">Grafica cualquier par entre P, d, P<sub>75</sub>, l<sub>75</sub>, |m<sub>75</sub>|, W<sub>f</sub>, G<sub>f</sub> y CT<sub>index</sub>, y observa la trayectoria que se dibuja al modificar la curva.</p>
+      </article>
+      <article class="card">
+        <div class="ic green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2h8M12 2v3l-5 2 10 3-10 3 10 3-5 2v1"/><rect x="8" y="19" width="8" height="3.5" rx="1"/></svg></div>
+        <h3><span data-lang="en">Springs and live equation</span><span data-lang="es">Resortes y ecuación en vivo</span></h3>
+        <p data-lang="en">Springs and the CT<sub>index</sub> equation turn green when a variable increases and red when it decreases — sensitivity you can actually see.</p>
+        <p data-lang="es">Los resortes y la ecuación del CT<sub>index</sub> se tornan verdes cuando una variable aumenta y rojos cuando disminuye: la sensibilidad se vuelve visible.</p>
+      </article>
+      <article class="card">
+        <div class="ic ink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg></div>
+        <h3><span data-lang="en">Printable report</span><span data-lang="es">Reporte imprimible</span></h3>
+        <p data-lang="en">Save a self-contained report with project and specimen data, model and ASTM results, and the plot — then print it to PDF from your browser.</p>
+        <p data-lang="es">Guarda un reporte autocontenido con los datos del proyecto y la probeta, los resultados del modelo y de la ASTM, y la gráfica; luego imprímelo a PDF desde el navegador.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════ Quick start ═════════════ -->
+<section class="block alt" id="start">
+  <div class="wrap">
+    <p class="kicker"><span data-lang="en">Quick start</span><span data-lang="es">Guía rápida</span></p>
+    <h2 data-lang="en">From test record to CT<sub>index</sub> in four steps</h2>
+    <h2 data-lang="es">Del registro del ensayo al CT<sub>index</sub> en cuatro pasos</h2>
+    <ol class="steps">
+      <li>
+        <span data-lang="en"><b>Open the app</b> in any modern browser — desktop, tablet or phone.</span>
+        <span data-lang="es"><b>Abre la aplicación</b> en cualquier navegador moderno: computadora, tableta o teléfono.</span>
+      </li>
+      <li>
+        <span data-lang="en"><b>Enter the specimen size:</b> diameter <i>D</i> and thickness <i>t</i> (150 mm and 62 mm by default).</span>
+        <span data-lang="es"><b>Ingresa las dimensiones</b> de la probeta: diámetro <i>D</i> y espesor <i>t</i> (150 mm y 62 mm por defecto).</span>
+      </li>
+      <li>
+        <span data-lang="en"><b>Shape or fit the curve:</b> drag the markers, or click <span class="ui">Import .xlsx / .csv</span> and then <span class="ui">Optimize</span>.</span>
+        <span data-lang="es"><b>Modela o ajusta la curva:</b> arrastra los marcadores, o haz clic en <span class="ui">Import .xlsx / .csv</span> y luego en <span class="ui">Optimize</span>.</span>
+      </li>
+      <li>
+        <span data-lang="en"><b>Review and save:</b> read the results on the plot, add project and specimen names, and click <span class="ui">Save report</span>.</span>
+        <span data-lang="es"><b>Revisa y guarda:</b> lee los resultados en la gráfica, escribe el proyecto y la probeta, y haz clic en <span class="ui">Save report</span>.</span>
+      </li>
+    </ol>
+    <div class="tips">
+      <div class="tip">
+        <span data-lang="en"><b>Data format.</b> Two numeric columns — load in kN and displacement in mm — on any sheet. CSV files may use commas, semicolons or tabs; header rows are skipped automatically.</span>
+        <span data-lang="es"><b>Formato de datos.</b> Dos columnas numéricas —carga en kN y desplazamiento en mm— en cualquier hoja. Los CSV pueden usar comas, punto y coma o tabuladores; las filas de encabezado se omiten automáticamente.</span>
+      </div>
+      <div class="tip note">
+        <span data-lang="en"><b>Good to know.</b> The Curve Explorer complements — it does not replace — the standard ASTM D8225 procedure, which remains the reference for acceptance testing.</span>
+        <span data-lang="es"><b>Importante.</b> El Curve Explorer complementa —no reemplaza— el procedimiento estándar de la ASTM D8225, que sigue siendo la referencia para los ensayos de aceptación.</span>
+      </div>
+    </div>
+    <div class="cta" style="margin-top:28px">
+      <a class="btn primary" href="index_interactive.html">
+        <span data-lang="en">Open the app</span><span data-lang="es">Abrir la aplicación</span>
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h12M11 5l5 5-5 5"/></svg>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════ Author & license ═════════════ -->
+<section class="block" id="author">
+  <div class="wrap">
+    <p class="kicker"><span data-lang="en">Author and license</span><span data-lang="es">Autoría y licencia</span></p>
+    <h2 data-lang="en">Free to use — with credit</h2>
+    <h2 data-lang="es">De uso libre, dando crédito</h2>
+    <div class="credit">
+      <div class="card author-card">
+        <div class="avatar" aria-hidden="true">EC</div>
+        <div>
+          <div class="role"><span data-lang="en">Author</span><span data-lang="es">Autor</span></div>
+          <p class="name">Dr. Elvis A. Castillo-Camarena</p>
+          <p class="aff">
+            Universidad Tecnológica de Panamá (UTP)<br>
+            <span data-lang="en">School of Civil Engineering</span><span data-lang="es">Facultad de Ingeniería Civil</span><br>
+            <span data-lang="en">Panama City, Panama</span><span data-lang="es">Ciudad de Panamá, Panamá</span>
+          </p>
+        </div>
+      </div>
+      <div class="card license">
+        <a class="badge" href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener license">CC BY 4.0</a>
+        <p data-lang="en">
+          You may use, share and adapt the IDEAL-CT Curve Explorer — in courses, research,
+          reports and professional work — under the Creative Commons Attribution 4.0
+          International license, <b>provided you give credit to the author,
+          Dr. Elvis A. Castillo-Camarena, and to the Universidad Tecnológica de Panamá (UTP)</b>.
+        </p>
+        <p data-lang="es">
+          Puedes usar, compartir y adaptar el IDEAL-CT Curve Explorer —en cursos,
+          investigaciones, informes y trabajo profesional— bajo la licencia Creative Commons
+          Atribución 4.0 Internacional, <b>siempre que des crédito al autor,
+          Dr. Elvis A. Castillo-Camarena, y a la Universidad Tecnológica de Panamá (UTP)</b>.
+        </p>
+        <p style="margin-bottom:6px"><span data-lang="en">Suggested credit line:</span><span data-lang="es">Texto de crédito sugerido:</span></p>
+        <div class="cite">
+          <code id="credit-en" data-lang="en">IDEAL-CT Curve Explorer — Dr. Elvis A. Castillo-Camarena, Universidad Tecnológica de Panamá (UTP). Licensed under CC BY 4.0.</code>
+          <code id="credit-es" data-lang="es">IDEAL-CT Curve Explorer — Dr. Elvis A. Castillo-Camarena, Universidad Tecnológica de Panamá (UTP). Licencia CC BY 4.0.</code>
+          <button type="button" class="copy" id="copy-credit"><span data-lang="en">Copy</span><span data-lang="es">Copiar</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <span>© 2026 Elvis A. Castillo-Camarena · Universidad Tecnológica de Panamá (UTP)</span>
+    <span>
+      <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener license">CC BY 4.0</a>
+      · <a href="index_interactive.html"><span data-lang="en">Open the app</span><span data-lang="es">Abrir la aplicación</span></a>
+    </span>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var buttons = document.querySelectorAll("[data-set-lang]");
+    function setLang(lang) {
+      root.setAttribute("data-ui", lang);
+      root.setAttribute("lang", lang);
+      for (var i = 0; i < buttons.length; i++) {
+        buttons[i].setAttribute("aria-pressed", buttons[i].getAttribute("data-set-lang") === lang ? "true" : "false");
+      }
+      try { localStorage.setItem("ctx-lang", lang); } catch (e) {}
+    }
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].addEventListener("click", function () { setLang(this.getAttribute("data-set-lang")); });
+    }
+    setLang(root.getAttribute("data-ui") || "en");
+
+    var copyBtn = document.getElementById("copy-credit");
+    copyBtn.addEventListener("click", function () {
+      var lang = root.getAttribute("data-ui");
+      var text = document.getElementById(lang === "es" ? "credit-es" : "credit-en").textContent;
+      var labels = copyBtn.querySelectorAll("[data-lang]");
+      function flash() {
+        labels[0].textContent = "Copied ✓"; labels[1].textContent = "Copiado ✓";
+        setTimeout(function () { labels[0].textContent = "Copy"; labels[1].textContent = "Copiar"; }, 1600);
+      }
+      try {
+        navigator.clipboard.writeText(text).then(flash, function () {});
+      } catch (e) {}
+    });
+  })();
+</script>
+</body>
+</html>

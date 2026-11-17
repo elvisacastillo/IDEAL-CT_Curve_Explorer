@@ -1,0 +1,5 @@
+# Keep the manuscript and other PDFs out of the public repository
+*.pdf
+
+# macOS
+.DS_Store

@@ -1,0 +1,2222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IDEAL-CT Curve Explorer — Interactive</title>
+<meta name="author" content="Elvis A. Castillo-Camarena">
+<meta name="description" content="IDEAL-CT Curve Explorer by Dr. Elvis A. Castillo-Camarena, Universidad Tecnológica de Panamá (UTP). Licensed under CC BY 4.0.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232B6CB0'/%3E%3Cpath d='M5 26 C9 6 13 6 16 9 S22 22 27 25' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round'/%3E%3Ccircle cx='13.5' cy='7.6' r='2.6' fill='%23FC8181'/%3E%3C/svg%3E">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FAFAFA;
+    --panel: #FFFFFF;
+    --border: #CBD5E0;
+    --muted: #718096;
+    --label: #4A5568;
+    --curve: #2B6CB0;
+    --fill: #BEE3F8;
+    --peak: #E53E3E;
+    --p75: #805AD5;
+    --rise: #2F855A;
+    --target: #DD6B20;
+    --slider: #CBD5E0;
+    --slider2: #FED7D7;
+    --slider3: #C6F6D5;
+    --up: #16A34A;
+    --down: #DC2626;
+    --same: #1A202C;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: 'Source Serif 4', Georgia, serif;
+    background: var(--bg);
+    color: #1A202C;
+    font-size: 14px;
+  }
+  .app {
+    max-width: 1500px;
+    margin: 0 auto;
+    padding: 18px 22px 40px;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    margin-bottom: 12px;
+  }
+  h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 600;
+    color: #1A202C;
+  }
+  header .sub { color: var(--muted); font-style: italic; font-size: 12px; }
+  header .byline {
+    margin-top: 3px;
+    font-size: 13px;
+    color: var(--label);
+  }
+  header .byline b { color: #1A202C; font-weight: 600; }
+  header .header-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+  .home-link {
+    font-size: 12.5px;
+    color: var(--curve);
+    text-decoration: none;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 2px 11px;
+    background: var(--panel);
+  }
+  .home-link:hover { border-color: var(--curve); background: #EBF8FF; }
+  footer a { color: #718096; }
+
+  .plots {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 18px;
+    margin-bottom: 14px;
+  }
+  .plot-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px 4px;
+  }
+  #plot1, #plot2 { width: 100%; height: 430px; }
+  #plot1 { user-select: none; }
+
+  .plot-toolbar {
+    display: flex;
+    gap: 16px;
+    padding: 4px 6px 8px;
+    font-size: 12px;
+    color: var(--label);
+    flex-wrap: wrap;
+  }
+  .plot-toolbar label { cursor: pointer; user-select: none; }
+  .plot-toolbar input { margin-right: 4px; vertical-align: middle; }
+  .drag-hint {
+    margin-left: auto;
+    color: var(--muted);
+    font-style: italic;
+    font-size: 11px;
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 18px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+  }
+  .panel h3 {
+    margin: 0 0 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--label);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .slider-row {
+    display: grid;
+    grid-template-columns: 90px 1fr 80px;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .slider-row label {
+    font-size: 13px;
+    color: var(--label);
+  }
+  .slider-row input[type=range] {
+    width: 100%;
+    accent-color: var(--curve);
+  }
+  .slider-row .val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: #1A202C;
+    text-align: right;
+  }
+  .slider-row.view input[type=range] { accent-color: #F56565; }
+  .slider-row.view.y input[type=range] { accent-color: #48BB78; }
+
+  .spacer { height: 8px; border-top: 1px dashed #E2E8F0; margin: 10px 0; }
+
+  .radio-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .radio-col h4 {
+    margin: 0 0 6px;
+    font-size: 11px;
+    color: var(--label);
+    text-align: center;
+    font-weight: 700;
+  }
+  .radio-col label {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 3px 6px;
+    cursor: pointer;
+    border-radius: 4px;
+    color: var(--label);
+  }
+  .radio-col label:hover { background: #EDF2F7; }
+  .radio-col input { margin-right: 6px; }
+
+  .spec-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto 1fr;
+    gap: 8px;
+    align-items: center;
+    margin-top: 12px;
+  }
+  .spec-row label { font-size: 12px; color: var(--label); }
+  .spec-row input[type=number],
+  .spec-row input[type=text] {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    width: 100%;
+    background: #F7FAFC;
+  }
+
+  .button-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  button {
+    font-family: 'Source Serif 4', serif;
+    font-size: 12px;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  button.import { background: #EBF8FF; }
+  button.import:hover { background: #BEE3F8; }
+  button.clear { background: #FFF5F5; }
+  button.clear:hover { background: #FED7D7; }
+  button.optimize { background: #F0FFF4; }
+  button.optimize:hover { background: #C6F6D5; }
+  button.report { background: #FEFCBF; }
+  button.report:hover { background: #FAF089; }
+
+  /* CT equation overlay */
+  .ct-eq {
+    display: none;
+    font-family: 'Source Serif 4', serif;
+  }
+  .ct-eq.visible { display: block; }
+  .radio-group.hidden { display: none; }
+
+  .eq-formula {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    font-size: 17px;
+    padding: 14px 6px 10px;
+  }
+  .frac {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.1;
+  }
+  .frac .num, .frac .den { padding: 0 6px; font-style: italic; }
+  .frac .bar { border-top: 1.2px solid var(--same); width: 100%; margin: 2px 0; }
+  .times { font-size: 14px; color: var(--label); }
+
+  .eq-values {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+    padding-top: 8px;
+    border-top: 1px dashed #E2E8F0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-align: center;
+  }
+  .eq-values .lbl { color: var(--muted); font-size: 9.5px; }
+  .eq-values .v { font-weight: 700; padding-top: 2px; }
+
+  .info-overlay {
+    position: absolute;
+    top: 16px; right: 20px;
+    background: rgba(255,255,255,0.94);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    line-height: 1.55;
+    white-space: pre;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .plot-card { position: relative; }
+
+  /* Drag legend */
+  .drag-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 6px 6px 4px;
+    font-size: 11.5px;
+    color: var(--label);
+    border-top: 1px dashed #E2E8F0;
+    margin-top: 4px;
+  }
+  .drag-legend .swatch {
+    display: inline-block;
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    border: 1.4px solid white;
+    box-shadow: 0 0 0 1px var(--border);
+    vertical-align: -1px;
+    margin-right: 5px;
+  }
+  .drag-legend .sw-peak { background: #E53E3E; }
+  .drag-legend .sw-decay { background: #805AD5; }
+  .drag-legend .sw-rise { background: #2F855A; }
+
+  footer {
+    margin-top: 20px;
+    text-align: right;
+    color: #A0AEC0;
+    font-size: 11px;
+    font-style: italic;
+  }
+
+  @media (max-width: 1100px) {
+    .plots, .controls { grid-template-columns: 1fr; }
+  }
+
+  /* Import-options modal */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(26, 32, 44, 0.45);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 50;
+  }
+  .modal-backdrop.visible { display: flex; }
+  .modal-body {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 22px 16px;
+    min-width: 320px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  }
+  .modal-body h3 {
+    margin: 0 0 12px;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--label);
+  }
+  .modal-row {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .modal-row label { font-size: 12px; color: var(--label); }
+  .modal-row select, .modal-row input {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: #F7FAFC;
+    width: 100%;
+  }
+  .modal-buttons {
+    display: flex; justify-content: flex-end; gap: 8px;
+    margin-top: 14px;
+  }
+  .modal-buttons button.primary { background: #EBF8FF; }
+  .modal-buttons button.primary:hover { background: #BEE3F8; }
+  .modal-help {
+    font-size: 11px; color: var(--muted);
+    margin: -4px 0 10px; font-style: italic;
+  }
+
+  /* Right-pane view toggle (Parameter Space ⇄ Variable Springs) */
+  .rs-toggle {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 4px 6px 8px;
+    font-size: 12px;
+    color: var(--label);
+  }
+  .rs-toggle label { cursor: pointer; user-select: none; }
+  .rs-toggle input { margin-right: 4px; vertical-align: middle; }
+  .rs-toggle .hint {
+    margin-left: auto;
+    color: var(--muted);
+    font-style: italic;
+    font-size: 11px;
+  }
+
+  /* Variable Springs view */
+  #springs-view {
+    display: none;
+    width: 100%;
+    height: 430px;
+    padding: 6px 8px 4px;
+    flex-direction: column;
+  }
+  #springs-view.visible { display: flex; }
+  .spring-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    flex: 1;
+    min-height: 0;
+  }
+  .spring-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
+  }
+  .spring-svg-wrap {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    min-height: 0;
+  }
+  .spring-svg {
+    width: 100%;
+    height: 100%;
+    max-width: 88px;
+    overflow: visible;
+  }
+  .spring-top { fill: #4A5568; }
+  .spring-hook { stroke: #4A5568; stroke-width: 2; }
+  .spring-coil {
+    stroke-width: 2.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+  .spring-body {
+    transition: filter 0.32s ease-out;
+  }
+  .spring-body.up   { filter: drop-shadow(0 0 7px rgba(22,163,74,0.70)); }
+  .spring-body.down { filter: drop-shadow(0 0 7px rgba(220,38,38,0.70)); }
+  .spring-coil-group {
+    transform-box: fill-box;
+    transform-origin: top center;
+    transform: scaleY(var(--coil-scale, 1));
+    transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .spring-weight-group {
+    transform-box: fill-box;
+    transform-origin: top center;
+    /* Counter-scale so the weight stays the same shape while still being
+       carried down/up by the parent coil group's scaling. */
+    transform: scaleY(calc(1 / var(--coil-scale, 1)));
+    transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .spring-weight {
+    stroke: rgba(0,0,0,0.18);
+    stroke-width: 0.5;
+    vector-effect: non-scaling-stroke;
+    filter: drop-shadow(0 1.5px 1.5px rgba(0,0,0,0.20));
+  }
+  .spring-weight-label {
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    fill: #FFFFFF;
+    pointer-events: none;
+    letter-spacing: 0.3px;
+  }
+  .spring-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    margin-top: 3px;
+    color: #1A202C;
+    text-align: center;
+  }
+  .spring-unit {
+    font-weight: 400;
+    color: var(--muted);
+    font-size: 10.5px;
+  }
+  .spring-delta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    margin-top: 1px;
+    height: 14px;
+    text-align: center;
+  }
+  .spring-delta .up   { color: var(--up); }
+  .spring-delta .down { color: var(--down); }
+  .spring-delta .same { color: var(--muted); }
+  .springs-help {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 11px;
+    font-style: italic;
+    color: var(--muted);
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px dashed #E2E8F0;
+    flex-wrap: wrap;
+  }
+  .spring-rebase {
+    font-family: 'Source Serif 4', serif;
+    font-style: normal;
+    font-size: 11px;
+    padding: 3px 9px;
+    background: #EDF2F7;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .spring-rebase:hover { background: #E2E8F0; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <h1>IDEAL-CT Curve Explorer <span style="color:#2F855A;font-weight:400;font-size:15px;">— Interactive</span></h1>
+      <div class="byline">by <b>Dr. Elvis A. Castillo-Camarena</b> &nbsp;·&nbsp; Universidad Tecnológica de Panamá (UTP)</div>
+    </div>
+    <div class="header-right">
+      <a class="home-link" href="index.html">&larr; Home</a>
+      <div class="sub">Drag the points on the curve to adjust P, d, n<sub>d</sub>, n<sub>r</sub></div>
+    </div>
+  </header>
+
+  <div class="plots">
+    <div class="plot-card">
+      <div id="plot1"></div>
+      <div id="info-box" class="info-overlay"></div>
+      <div class="plot-toolbar">
+        <label><input type="checkbox" id="chk-m75"> Show m75 tangent</label>
+        <label><input type="checkbox" id="chk-eq"> Show CT equation</label>
+        <span class="drag-hint" id="drag-hint">Tip: drag the colored markers to change P, d, n<sub>d</sub>, n<sub>r</sub></span>
+      </div>
+      <div class="drag-legend">
+        <span><span class="swatch sw-peak"></span>Peak (d, P) &mdash; drag any direction</span>
+        <span><span class="swatch sw-rise"></span>Rise side at 0.75·P &mdash; drag to change n<sub>r</sub></span>
+        <span><span class="swatch sw-decay"></span>Decay side at 0.75·P &mdash; drag to change n<sub>d</sub></span>
+      </div>
+    </div>
+    <div class="plot-card">
+      <div class="rs-toggle">
+        <label><input type="radio" name="rs-view" value="space" checked> Parameter Space (X vs Y)</label>
+        <label><input type="radio" name="rs-view" value="springs"> CT variable springs</label>
+        <span class="hint" id="rs-hint">Each spring stretches/contracts as its variable changes</span>
+      </div>
+      <div id="plot2"></div>
+      <div id="springs-view"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="panel">
+      <h3>Model Parameters</h3>
+      <div class="slider-row">
+        <label>P&nbsp;(kN)</label>
+        <input type="range" id="s-P" min="0.5" max="30" step="0.1" value="10">
+        <span class="val" id="v-P">10.0</span>
+      </div>
+      <div class="slider-row">
+        <label>d&nbsp;(mm)</label>
+        <input type="range" id="s-d" min="0.5" max="15" step="0.1" value="4">
+        <span class="val" id="v-d">4.0</span>
+      </div>
+      <div class="slider-row">
+        <label>Decay&nbsp;n<sub>d</sub></label>
+        <input type="range" id="s-nd" min="0.1" max="30" step="0.1" value="2">
+        <span class="val" id="v-nd">2.0</span>
+      </div>
+      <div class="slider-row">
+        <label>Rise&nbsp;n<sub>r</sub></label>
+        <input type="range" id="s-nr" min="0.5" max="15" step="0.1" value="1.2">
+        <span class="val" id="v-nr">1.2</span>
+      </div>
+
+      <div class="spacer"></div>
+      <h3>View</h3>
+      <div class="slider-row view">
+        <label>X range (mm)</label>
+        <input type="range" id="s-xlim" min="5" max="200" step="1" value="25">
+        <span class="val" id="v-xlim">25</span>
+      </div>
+      <div class="slider-row view y">
+        <label>Y range (kN)</label>
+        <input type="range" id="s-ylim" min="1" max="100" step="0.5" value="16">
+        <span class="val" id="v-ylim">16.0</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Parameter Space Axes</h3>
+
+      <div id="radio-wrap" class="radio-group">
+        <div class="radio-col" id="col-y">
+          <h4>Y axis</h4>
+        </div>
+        <div class="radio-col" id="col-x">
+          <h4>X axis</h4>
+        </div>
+      </div>
+
+      <div id="ct-eq" class="ct-eq">
+        <div class="eq-formula">
+          <span id="eq-name" style="font-style:italic;">CT<sub>index</sub></span>
+          <span>=</span>
+          <span class="frac">
+            <span class="num" id="eq-t-name">t</span>
+            <span class="bar"></span>
+            <span class="den">62</span>
+          </span>
+          <span class="times">&times;</span>
+          <span class="frac">
+            <span class="num" id="eq-l75-name">l<sub>75</sub></span>
+            <span class="bar"></span>
+            <span class="den" id="eq-D-name">D</span>
+          </span>
+          <span class="times">&times;</span>
+          <span class="frac">
+            <span class="num" id="eq-Gf-name">G<sub>f</sub></span>
+            <span class="bar"></span>
+            <span class="den" id="eq-m75-name">|m<sub>75</sub>|</span>
+          </span>
+          <span class="times">&times; 10<sup>6</sup></span>
+        </div>
+        <div class="eq-values">
+          <div><div class="lbl">CT =</div><div class="v" id="eq-v-CT">&mdash;</div></div>
+          <div><div class="lbl">t =</div><div class="v" id="eq-v-t">&mdash;</div></div>
+          <div><div class="lbl">l75 =</div><div class="v" id="eq-v-l75">&mdash;</div></div>
+          <div><div class="lbl">D =</div><div class="v" id="eq-v-D">&mdash;</div></div>
+          <div><div class="lbl">Gf =</div><div class="v" id="eq-v-Gf">&mdash;</div></div>
+          <div><div class="lbl">|m75| =</div><div class="v" id="eq-v-m75">&mdash;</div></div>
+        </div>
+      </div>
+
+      <div class="spec-row">
+        <label>Project</label>
+        <input type="text" id="rep-project" placeholder="(optional)">
+        <label>Specimen</label>
+        <input type="text" id="rep-specimen" placeholder="(optional)">
+      </div>
+
+      <div class="spec-row">
+        <label>D (mm)</label>
+        <input type="number" id="in-D" value="150" step="0.1">
+        <label>t (mm)</label>
+        <input type="number" id="in-t" value="62" step="0.1">
+      </div>
+
+      <div class="button-row">
+        <button class="import" id="btn-import">Import .xlsx / .csv</button>
+        <button class="clear" id="btn-clear">Clear data</button>
+        <button class="optimize" id="btn-optimize">Optimize</button>
+        <button class="report" id="btn-report">Save report</button>
+      </div>
+      <input type="file" id="file-input" accept=".xlsx,.xls,.csv" style="display:none">
+    </div>
+  </div>
+
+  <footer>
+    © 2026 Dr. Elvis A. Castillo-Camarena &nbsp;·&nbsp; Universidad Tecnológica de Panamá (UTP)
+    &nbsp;·&nbsp; Interactive Edition &nbsp;·&nbsp;
+    <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener license">CC BY 4.0</a>
+  </footer>
+
+  <!-- Import-options modal (sheet + column selection) -->
+  <div id="import-modal" class="modal-backdrop">
+    <div class="modal-body">
+      <h3>Import options</h3>
+      <div class="modal-help" id="mod-filename">&nbsp;</div>
+      <div class="modal-row">
+        <label>Sheet</label>
+        <select id="mod-sheet"></select>
+      </div>
+      <div class="modal-row">
+        <label>Load col (letter)</label>
+        <input id="mod-load" type="text" value="A" maxlength="3" autocomplete="off">
+      </div>
+      <div class="modal-row">
+        <label>Disp col (letter)</label>
+        <input id="mod-disp" type="text" value="B" maxlength="3" autocomplete="off">
+      </div>
+      <div class="modal-buttons">
+        <button id="mod-cancel">Cancel</button>
+        <button id="mod-ok" class="primary">Import</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// Model
+// ─────────────────────────────────────────────────────────────────────────────
+const TARGET_LOAD = 0.1;
+
+function idealCt(xArr, P, d, nr, nd) {
+  const y = new Float64Array(xArr.length);
+  for (let i = 0; i < xArr.length; i++) {
+    const xv = xArr[i];
+    const t = xv / d;
+    const n = xv <= d ? nr : nd;
+    if (xv <= 0) { y[i] = 0; continue; }
+    y[i] = P * Math.pow(t, n) * Math.exp(n * (1 - t));
+  }
+  return y;
+}
+
+function decayEval(xv, P, d, nd) {
+  const t = xv / d;
+  return P * Math.pow(t, nd) * Math.exp(nd * (1 - t));
+}
+function riseEval(xv, P, d, nr) {
+  const t = xv / d;
+  return P * Math.pow(t, nr) * Math.exp(nr * (1 - t));
+}
+
+// Brent's method for root finding on the decay branch (x > d)
+function findXatLoad(target, P, d, nd, xmax = 500.0) {
+  if (P <= target) return null;
+  const g = (xv) => decayEval(xv, P, d, nd) - target;
+  let a = d + 1e-9;
+  let b = xmax;
+  let fa = g(a), fb = g(b);
+  if (fa * fb > 0) return null;
+  let c = a, fc = fa, s = b, fs = fb, d_prev = b - a, e = d_prev;
+  const EPS = 1e-12, tol = 1e-9;
+  for (let iter = 0; iter < 100; iter++) {
+    if (fb * fc > 0) { c = a; fc = fa; d_prev = b - a; e = d_prev; }
+    if (Math.abs(fc) < Math.abs(fb)) {
+      a = b; b = c; c = a; fa = fb; fb = fc; fc = fa;
+    }
+    const tol1 = 2 * EPS * Math.abs(b) + 0.5 * tol;
+    const m = 0.5 * (c - b);
+    if (Math.abs(m) <= tol1 || fb === 0) return b;
+    if (Math.abs(e) >= tol1 && Math.abs(fa) > Math.abs(fb)) {
+      let p, q;
+      s = fb / fa;
+      if (a === c) {
+        p = 2 * m * s;
+        q = 1 - s;
+      } else {
+        q = fa / fc;
+        const r = fb / fc;
+        p = s * (2 * m * q * (q - r) - (b - a) * (r - 1));
+        q = (q - 1) * (r - 1) * (s - 1);
+      }
+      if (p > 0) q = -q;
+      p = Math.abs(p);
+      if (2 * p < Math.min(3 * m * q - Math.abs(tol1 * q), Math.abs(e * q))) {
+        e = d_prev;
+        d_prev = p / q;
+      } else {
+        d_prev = m;
+        e = d_prev;
+      }
+    } else {
+      d_prev = m;
+      e = d_prev;
+    }
+    a = b; fa = fb;
+    if (Math.abs(d_prev) > tol1) b += d_prev;
+    else b += (m > 0 ? tol1 : -tol1);
+    fb = g(b);
+  }
+  return b;
+}
+
+// Bisection: find x in (0, d] where the rising branch equals `target`
+function findRiseXatLoad(target, P, d, nr) {
+  if (target <= 0 || target >= P) return null;
+  let a = 1e-9, b = d;
+  let fa = riseEval(a, P, d, nr) - target;
+  let fb = riseEval(b, P, d, nr) - target;
+  if (fa * fb > 0) return null;
+  for (let i = 0; i < 200; i++) {
+    const m = 0.5 * (a + b);
+    const fm = riseEval(m, P, d, nr) - target;
+    if (Math.abs(fm) < 1e-10 || (b - a) < 1e-10) return m;
+    if (fa * fm < 0) { b = m; fb = fm; }
+    else            { a = m; fa = fm; }
+  }
+  return 0.5 * (a + b);
+}
+
+// Adaptive Simpson integration for Wf
+function simpson(f, a, b, n = 200) {
+  if (n % 2) n++;
+  const h = (b - a) / n;
+  let s = f(a) + f(b);
+  for (let i = 1; i < n; i++) {
+    const x = a + i * h;
+    s += (i % 2 === 0 ? 2 : 4) * f(x);
+  }
+  return (s * h) / 3;
+}
+
+function computeWf(P, d, nr, nd, x01) {
+  if (x01 == null) return null;
+  const f1 = (xv) => P * Math.pow(xv / d, nr) * Math.exp(nr * (1 - xv / d));
+  const f2 = (xv) => P * Math.pow(xv / d, nd) * Math.exp(nd * (1 - xv / d));
+  const W1 = simpson(f1, 1e-9, d, 200);
+  const W2 = simpson(f2, d, x01, 400);
+  return W1 + W2;
+}
+
+function decaySlope(P, d, nd, xv) {
+  const t = xv / d;
+  const val = P * Math.pow(t, nd) * Math.exp(nd * (1 - t));
+  return val * nd * (1 / xv - 1 / d);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Drag-derivation helpers
+//
+//   The piecewise-Gamma model satisfies
+//        y(x) / P  =  (x/d)^n · exp(n · (1 − x/d))
+//   On either branch, locking y/P to 0.75 (= P75/P) yields
+//        ln(0.75) = n · (ln(r) + 1 − r),         r = x/d
+//   so we can recover the exponent from a target r:
+//        n = ln(0.75) / (ln(r) + 1 − r)
+// ─────────────────────────────────────────────────────────────────────────────
+const LN_075 = Math.log(0.75);
+function exponentFromRatio(r) {
+  // r = x/d.  Returns n ≥ 0 (NaN/Infinity guarded outside).
+  if (!isFinite(r) || r <= 0 || Math.abs(r - 1) < 1e-6) return null;
+  const denom = Math.log(r) + 1 - r;       // strictly negative for r ≠ 1
+  if (Math.abs(denom) < 1e-12) return null;
+  const n = LN_075 / denom;
+  if (!isFinite(n) || n <= 0) return null;
+  return n;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Spreadsheet helpers + ASTM D8225 computation
+// ─────────────────────────────────────────────────────────────────────────────
+function colLetterToIndex(letter) {
+  const L = String(letter || "").trim().toUpperCase();
+  if (!L || !/^[A-Z]+$/.test(L)) throw new Error(`Invalid column letter: ${letter}`);
+  let idx = 0;
+  for (const ch of L) idx = idx * 26 + (ch.charCodeAt(0) - 64);
+  return idx - 1;
+}
+
+function readSheetByColumns(rows, loadCol, dispCol) {
+  const li = colLetterToIndex(loadCol);
+  const di = colLetterToIndex(dispCol);
+  const loads = [], disps = [];
+  for (const r of rows) {
+    if (!r) continue;
+    if (li >= r.length || di >= r.length) continue;
+    const lv = parseFloat(r[li]);
+    const dv = parseFloat(r[di]);
+    if (!isNaN(lv) && !isNaN(dv) && isFinite(lv) && isFinite(dv)) {
+      loads.push(lv);
+      disps.push(dv);
+    }
+  }
+  return { loads, disps };
+}
+
+function linregress(xArr, yArr) {
+  const n = xArr.length;
+  if (n < 2) return null;
+  let sx = 0, sy = 0, sxx = 0, sxy = 0, syy = 0;
+  for (let i = 0; i < n; i++) {
+    sx += xArr[i]; sy += yArr[i];
+    sxx += xArr[i] * xArr[i];
+    sxy += xArr[i] * yArr[i];
+    syy += yArr[i] * yArr[i];
+  }
+  const denom = n * sxx - sx * sx;
+  if (denom === 0) return null;
+  const slope = (n * sxy - sx * sy) / denom;
+  const intercept = (sy - slope * sx) / n;
+  const ssTot = syy - (sy * sy) / n;
+  const ssRes = syy - intercept * sy - slope * sxy;
+  const r2 = ssTot !== 0 ? 1 - ssRes / ssTot : 0;
+  return { slope, intercept, r2 };
+}
+
+function computeAstmCt(xArr, yArr, D, t) {
+  if (!xArr || !yArr || xArr.length < 5) return null;
+
+  const order = xArr.map((_, i) => i).sort((a, b) => xArr[a] - xArr[b]);
+  let xs = order.map(i => xArr[i]);
+  let ys = order.map(i => yArr[i]);
+
+  const xf = [], yf = [];
+  for (let i = 0; i < xs.length; i++) {
+    if (ys[i] >= 0.1) { xf.push(xs[i]); yf.push(ys[i]); }
+  }
+  if (xf.length < 5) return null;
+
+  let Wf = 0;
+  for (let i = 0; i < xf.length; i++) {
+    const dx = i === 0 ? 0 : (xf[i] - xf[i - 1]);
+    Wf += yf[i] * dx;
+  }
+  const Gf = Wf / (D * t) * 1e6;
+
+  let P100 = -Infinity, peakIdx = 0;
+  for (let i = 0; i < yf.length; i++) {
+    if (yf[i] > P100) { P100 = yf[i]; peakIdx = i; }
+  }
+  const xPeak = xf[peakIdx];
+  const P85 = 0.85 * P100;
+  const P75 = 0.75 * P100;
+  const P65 = 0.65 * P100;
+
+  const xb = [], yb = [];
+  for (let i = 0; i < xf.length; i++) {
+    if (xf[i] > xPeak && yf[i] >= P65 && yf[i] <= P85) {
+      xb.push(xf[i]); yb.push(yf[i]);
+    }
+  }
+  if (xb.length < 2) return null;
+
+  const reg = linregress(xb, yb);
+  if (!reg || reg.slope === 0 || !isFinite(reg.slope)) return null;
+  const { slope, intercept, r2 } = reg;
+
+  const m75 = Math.abs(slope);
+  const l75 = (P75 - intercept) / slope;
+  const l65 = (P65 - intercept) / slope;
+  const l85 = (P85 - intercept) / slope;
+
+  const CT = (t / 62.0) * (l75 / D) * (Gf / m75);
+
+  return { P100, P85, P75, P65, l85, l75, l65, m75,
+           slope, intercept, r2, Wf, Gf, CT, xPeak };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────────────────────────────────────
+const state = {
+  P: 10, d: 4, nr: 1.2, nd: 2,
+  xlim: 25, ylim: 16,
+  D: 150, t: 62,
+  expData: null,
+  expFilename: null,
+  showM75: false,
+  showEq: false,
+  trailX: [],
+  trailY: [],
+  paramX: "|m75|",
+  paramY: "CT",
+  prev: { t: null, l75: null, D: null, Gf: null, m75: null, CT: null },
+  // Drag state
+  drag: null,         // { which: 'peak' | 'rise' | 'decay', startMouse, startVals }
+  hoverHandle: null,  // for cursor feedback
+};
+
+// Bounds for drag-updates (kept in sync with slider ranges).
+const BOUNDS = {
+  P:  [0.5, 30.0],
+  d:  [0.5, 15.0],
+  nd: [0.1, 30.0],
+  nr: [0.5, 15.0],
+};
+function clampB(v, key) {
+  const [lo, hi] = BOUNDS[key];
+  return Math.min(Math.max(v, lo), hi);
+}
+
+const VAR_NAMES = ["P", "d", "P75", "l75", "|m75|", "Wf", "Gf", "CT"];
+
+function buildRadios() {
+  const colY = document.getElementById("col-y");
+  const colX = document.getElementById("col-x");
+  for (const name of VAR_NAMES) {
+    const lY = document.createElement("label");
+    lY.innerHTML = `<input type="radio" name="radio-y" value="${name}"${name === state.paramY ? " checked" : ""}> ${name}`;
+    colY.appendChild(lY);
+
+    const lX = document.createElement("label");
+    lX.innerHTML = `<input type="radio" name="radio-x" value="${name}"${name === state.paramX ? " checked" : ""}> ${name}`;
+    colX.appendChild(lX);
+  }
+  document.querySelectorAll('input[name=radio-y]').forEach(r => {
+    r.addEventListener("change", e => { state.paramY = e.target.value; state.trailX = []; state.trailY = []; update(); });
+  });
+  document.querySelectorAll('input[name=radio-x]').forEach(r => {
+    r.addEventListener("change", e => { state.paramX = e.target.value; state.trailX = []; state.trailY = []; update(); });
+  });
+}
+buildRadios();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Plots — initial build
+// ─────────────────────────────────────────────────────────────────────────────
+function linspace(a, b, n) {
+  const arr = new Float64Array(n);
+  const h = (b - a) / (n - 1);
+  for (let i = 0; i < n; i++) arr[i] = a + i * h;
+  return arr;
+}
+
+const x0 = linspace(0, 25, 800);
+const y0 = idealCt(x0, 10, 4, 1.2, 2);
+
+const baseLayout1 = {
+  margin: { t: 40, r: 20, b: 48, l: 54 },
+  paper_bgcolor: "#FFFFFF",
+  plot_bgcolor: "#FFFFFF",
+  title: { text: "IDEAL-CT &nbsp;&nbsp; Load – Displacement &nbsp;&nbsp; <span style='color:#2F855A;font-size:11px;font-style:italic;'>(drag the colored markers)</span>", font: { size: 14, family: "Source Serif 4, serif" } },
+  xaxis: { title: "Displacement (mm)", range: [0, 25], gridcolor: "#E2E8F0", zerolinecolor: "#CBD5E0", linecolor: "#555", fixedrange: true },
+  yaxis: { title: "Load (kN)", range: [0, 16], gridcolor: "#E2E8F0", zerolinecolor: "#CBD5E0", linecolor: "#555", fixedrange: true },
+  showlegend: false,
+  font: { family: "Source Serif 4, serif", size: 11 },
+  shapes: [],
+  // Disable the plotly drag (we handle dragging manually)
+  dragmode: false,
+  hovermode: "closest"
+};
+
+const baseLayout2 = {
+  margin: { t: 40, r: 20, b: 48, l: 54 },
+  paper_bgcolor: "#FFFFFF",
+  plot_bgcolor: "#FFFFFF",
+  title: { text: "Parameter Space", font: { size: 14, family: "Source Serif 4, serif" } },
+  xaxis: { title: state.paramX, gridcolor: "#E2E8F0", linecolor: "#555" },
+  yaxis: { title: state.paramY, gridcolor: "#E2E8F0", linecolor: "#555" },
+  showlegend: false,
+  font: { family: "Source Serif 4, serif", size: 11 }
+};
+
+// Trace indexing on plot1:
+// 0 fill (area under curve)
+// 1 main curve
+// 2 experimental data
+// 3 peak handle
+// 4 decay handle (l75, P75)
+// 5 rise handle (l_rise_75, P75)
+// 6 m75 tangent
+// 7 ASTM regression line (P65–P85 band)
+// 8 ASTM markers at (l65,P65), (l75,P75), (l85,P85)
+const HANDLE_OUTER = 17;     // larger outer ring for grabbable feel
+const HANDLE_INNER = 9;      // inner solid
+const initialTraces1 = [
+  { x: [], y: [], fill: "tozeroy", fillcolor: "rgba(190,227,248,0.45)", line: { color: "rgba(0,0,0,0)" }, type: "scatter", hoverinfo: "skip" },
+  { x: Array.from(x0), y: Array.from(y0), line: { color: "#2B6CB0", width: 2.4 }, type: "scatter", name: "Model", hoverinfo: "skip" },
+  { x: [], y: [], line: { color: "#A0AEC0", width: 1.6 }, type: "scatter", name: "Experimental", opacity: 0.8, hoverinfo: "skip" },
+  // Peak handle
+  { x: [4], y: [10], mode: "markers",
+    marker: { color: "#E53E3E", size: HANDLE_OUTER, opacity: 0.25, line: { color: "#E53E3E", width: 0 } },
+    type: "scatter", name: "Peak", hoverinfo: "text",
+    text: ["Peak (d, P) — drag to change d & P"] },
+  // Decay handle (l75, P75)
+  { x: [], y: [], mode: "markers",
+    marker: { color: "#805AD5", size: HANDLE_OUTER, opacity: 0.22, line: { color: "#805AD5", width: 0 } },
+    type: "scatter", name: "P75 decay", hoverinfo: "text",
+    text: ["Decay (l75, P75) — drag horizontally to change n_d"] },
+  // Rise handle (l_rise_75, P75)
+  { x: [], y: [], mode: "markers",
+    marker: { color: "#2F855A", size: HANDLE_OUTER, opacity: 0.22, line: { color: "#2F855A", width: 0 } },
+    type: "scatter", name: "P75 rise", hoverinfo: "text",
+    text: ["Rise (l_rise75, P75) — drag horizontally to change n_r"] },
+  // m75 tangent
+  { x: [], y: [], line: { color: "#E53E3E", width: 1.2, dash: "dash" }, type: "scatter", opacity: 0.75, hoverinfo: "skip" },
+  // ASTM
+  { x: [], y: [], line: { color: "#C05621", width: 1.2, dash: "dash" }, type: "scatter", opacity: 0.9, hoverinfo: "skip", name: "ASTM reg" },
+  { x: [], y: [], mode: "markers",
+    marker: { color: "#C05621", size: 8, symbol: "square", line: { color: "white", width: 1 } },
+    type: "scatter", name: "ASTM pts", hoverinfo: "skip" },
+  // Inner solid markers (drawn last so they sit on top of the outer halos):
+  // 9  peak inner
+  // 10 decay inner
+  // 11 rise inner
+  { x: [4], y: [10], mode: "markers",
+    marker: { color: "#E53E3E", size: HANDLE_INNER, line: { color: "white", width: 1.6 } },
+    type: "scatter", hoverinfo: "skip" },
+  { x: [], y: [], mode: "markers",
+    marker: { color: "#805AD5", size: HANDLE_INNER, line: { color: "white", width: 1.6 } },
+    type: "scatter", hoverinfo: "skip" },
+  { x: [], y: [], mode: "markers",
+    marker: { color: "#2F855A", size: HANDLE_INNER, line: { color: "white", width: 1.6 } },
+    type: "scatter", hoverinfo: "skip" }
+];
+
+// Plot 2 traces
+const initialTraces2 = [
+  { x: [], y: [], mode: "lines+markers", line: { color: "#2B6CB0", width: 1 }, marker: { size: 4, color: "#2B6CB0" }, opacity: 0.45, type: "scatter" },
+  { x: [], y: [], mode: "markers", marker: { color: "#E53E3E", size: 11, line: { color: "white", width: 1.4 } }, type: "scatter" }
+];
+
+Plotly.newPlot("plot1", initialTraces1, baseLayout1, { displayModeBar: false, responsive: true, scrollZoom: false });
+Plotly.newPlot("plot2", initialTraces2, baseLayout2, { displayModeBar: false, responsive: true });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Variable Springs view (alternative to Parameter Space)
+//
+//   Each spring corresponds to one variable in the CT_index equation.
+//   Spring length is scaled by (current_value / baseline_value)^0.7  — sub-linear
+//   so that small numerical changes are still visible without huge ones blowing
+//   off the page.  When the value changes between updates the spring briefly
+//   glows green (increasing) or red (decreasing).
+// ─────────────────────────────────────────────────────────────────────────────
+const SPRING_VARS = [
+  { key: "CT",   weightLabel: "CT",     unit: "",      color: "#805AD5", precision: 2 },
+  { key: "l75",  weightLabel: "l₇₅",  unit: "mm",    color: "#DD6B20", precision: 2 },
+  { key: "Gf",   weightLabel: "Gf",     unit: "J/m²",  color: "#2B6CB0", precision: 1 },
+  { key: "m75",  weightLabel: "|m₇₅|", unit: "kN/mm", color: "#E53E3E", precision: 3 }
+];
+
+// Spring SVG geometry (viewBox 0 0 60 290).  The coil-group is anchored at
+// SPR_TOP and scales vertically; the weight-group sits inside the coil-group
+// at SPR_BOTTOM, so it is carried up/down by the parent's scaling and
+// counter-scales itself so its own shape stays undistorted.
+const SPR_TOP = 14;
+const SPR_BOTTOM = 200;
+const SPR_NUM_LOOPS = 8;
+const springsState = {
+  baseline: {},      // captured initial value per key
+  prev: {},          // previous value per key (for direction flash)
+  flashTimer: {}     // setTimeout ids
+};
+
+function makeSpringSvg(color, weightLabel) {
+  // Build a zig-zag spring with mostly-straight diagonal segments and
+  // smoothly rounded turn-arounds at each side.  Vertices alternate between
+  // the left and right edges of the SVG; straight L commands form the
+  // diagonals and short Q curves smooth each turn.
+  const xL = 8, xR = 52, xC = 30;
+  const segH = (SPR_BOTTOM - SPR_TOP) / SPR_NUM_LOOPS;
+  const verts = [[xC, SPR_TOP]];
+  for (let i = 0; i < SPR_NUM_LOOPS; i++) {
+    verts.push([(i % 2 === 0) ? xR : xL, SPR_TOP + (i + 0.5) * segH]);
+  }
+  verts.push([xC, SPR_BOTTOM]);
+
+  const RADIUS = 5.5;
+  let d = `M ${verts[0][0].toFixed(2)},${verts[0][1].toFixed(2)}`;
+  for (let i = 1; i < verts.length - 1; i++) {
+    const prev = verts[i - 1], curr = verts[i], next = verts[i + 1];
+    const dxIn = curr[0] - prev[0], dyIn = curr[1] - prev[1];
+    const dxOut = next[0] - curr[0], dyOut = next[1] - curr[1];
+    const lenIn = Math.hypot(dxIn, dyIn);
+    const lenOut = Math.hypot(dxOut, dyOut);
+    const r = Math.min(RADIUS, lenIn * 0.45, lenOut * 0.45);
+    const bx = curr[0] - (dxIn / lenIn) * r;
+    const by = curr[1] - (dyIn / lenIn) * r;
+    const ax = curr[0] + (dxOut / lenOut) * r;
+    const ay = curr[1] + (dyOut / lenOut) * r;
+    d += ` L ${bx.toFixed(2)},${by.toFixed(2)}`;
+    d += ` Q ${curr[0].toFixed(2)},${curr[1].toFixed(2)} ${ax.toFixed(2)},${ay.toFixed(2)}`;
+  }
+  d += ` L ${verts[verts.length-1][0].toFixed(2)},${verts[verts.length-1][1].toFixed(2)}`;
+
+  // Weight: a hanging mass with the variable name on its face.
+  const W_W = 50, W_H = 36;
+  const W_X = (60 - W_W) / 2;
+  const W_Y = SPR_BOTTOM;             // top of the weight at scale = 1
+  const W_TXT_Y = W_Y + W_H / 2 + 4.2;
+
+  return `
+    <svg class="spring-svg" viewBox="0 0 60 290" preserveAspectRatio="xMidYMin meet">
+      <!-- Fixed ceiling + hook -->
+      <rect class="spring-top" x="6" y="0" width="48" height="5" rx="1.6"/>
+      <line class="spring-hook" x1="30" y1="5" x2="30" y2="${SPR_TOP}"/>
+      <g class="spring-body">
+        <!-- Coil group: scales vertically with --coil-scale -->
+        <g class="spring-coil-group">
+          <path class="spring-coil" d="${d}" fill="none" stroke="${color}"/>
+          <!-- Weight is nested inside the coil-group so it is translated
+               by the parent's scaling, but counter-scales itself so its
+               shape stays undistorted. -->
+          <g class="spring-weight-group">
+            <rect class="spring-weight" x="${W_X.toFixed(2)}" y="${W_Y}"
+                  width="${W_W}" height="${W_H}" rx="4.5" fill="${color}"/>
+            <text class="spring-weight-label" x="30" y="${W_TXT_Y.toFixed(2)}"
+                  text-anchor="middle">${weightLabel}</text>
+          </g>
+        </g>
+      </g>
+    </svg>
+  `;
+}
+
+function buildSpringsView() {
+  const wrap = document.getElementById("springs-view");
+  let html = `<div class="spring-grid">`;
+  for (const v of SPRING_VARS) {
+    html += `
+      <div class="spring-cell" data-key="${v.key}">
+        <div class="spring-svg-wrap">${makeSpringSvg(v.color, v.weightLabel)}</div>
+        <div class="spring-value">&mdash;</div>
+        <div class="spring-delta">&nbsp;</div>
+      </div>`;
+  }
+  html += `</div>
+    <div class="springs-help">
+      <span>Each weight is one variable in the CT<sub>index</sub> equation. As the variable grows the weight gets &ldquo;heavier&rdquo; and stretches the spring; as it shrinks, the spring contracts. Green glow = increasing, red = decreasing.</span>
+      <button class="spring-rebase" id="btn-rebase" type="button">Reset baseline</button>
+    </div>`;
+  wrap.innerHTML = html;
+  document.getElementById("btn-rebase").addEventListener("click", () => {
+    springsState.baseline = {};
+    springsState.prev = {};
+    update();
+  });
+}
+
+function updateSprings(values) {
+  const wrap = document.getElementById("springs-view");
+  if (!wrap || !wrap.classList.contains("visible")) return;
+  for (const v of SPRING_VARS) {
+    const cell = wrap.querySelector(`.spring-cell[data-key="${v.key}"]`);
+    if (!cell) continue;
+    const valEl   = cell.querySelector(".spring-value");
+    const deltaEl = cell.querySelector(".spring-delta");
+    const body    = cell.querySelector(".spring-body");
+    const cur = values[v.key];
+
+    if (cur == null || !isFinite(cur) || cur <= 0) {
+      valEl.textContent = "—";
+      deltaEl.innerHTML = "&nbsp;";
+      body.style.setProperty("--coil-scale", 1);
+      body.classList.remove("up", "down");
+      continue;
+    }
+
+    if (springsState.baseline[v.key] == null) {
+      springsState.baseline[v.key] = cur;
+    }
+    const baseline = springsState.baseline[v.key];
+    const ratio = cur / baseline;
+    // Sub-linear scaling so small numeric changes are visible
+    // and large ones don't blow past the SVG viewBox.
+    const scale = Math.min(Math.max(Math.pow(ratio, 0.7), 0.22), 1.55);
+    body.style.setProperty("--coil-scale", scale.toFixed(4));
+
+    const pct = (ratio - 1) * 100;
+    const dirClass = pct >  0.05 ? "up"
+                   : pct < -0.05 ? "down" : "same";
+    const arrow    = dirClass === "up" ? "▲"
+                   : dirClass === "down" ? "▼" : "·";
+    valEl.innerHTML = cur.toFixed(v.precision)
+      + (v.unit ? ` <span class="spring-unit">${v.unit}</span>` : "");
+    deltaEl.innerHTML = `<span class="${dirClass}">${arrow} ${Math.abs(pct).toFixed(1)}%</span>`;
+
+    // Glow in the direction of the most recent change
+    const prev = springsState.prev[v.key];
+    if (prev != null && Math.abs(cur - prev) > 1e-9) {
+      body.classList.remove("up", "down");
+      // Force reflow so the animation restarts cleanly
+      void body.getBBox;
+      body.classList.add(cur > prev ? "up" : "down");
+      clearTimeout(springsState.flashTimer[v.key]);
+      springsState.flashTimer[v.key] = setTimeout(() => {
+        body.classList.remove("up", "down");
+      }, 480);
+    }
+    springsState.prev[v.key] = cur;
+  }
+}
+
+buildSpringsView();
+
+// View toggle: Parameter Space ⇄ Variable Springs
+document.querySelectorAll('input[name="rs-view"]').forEach(r => {
+  r.addEventListener("change", e => {
+    const mode = e.target.value;
+    const plot2El   = document.getElementById("plot2");
+    const springsEl = document.getElementById("springs-view");
+    if (mode === "springs") {
+      plot2El.style.display = "none";
+      springsEl.classList.add("visible");
+      // Re-capture baseline on each open so deltas always start fresh
+      springsState.baseline = {};
+      springsState.prev = {};
+      update();
+    } else {
+      springsEl.classList.remove("visible");
+      plot2El.style.display = "";
+      // Re-flow Plotly after un-hiding
+      if (window.Plotly && Plotly.Plots && Plotly.Plots.resize) {
+        Plotly.Plots.resize("plot2");
+      }
+      update();
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CT equation overlay delta-color update
+// ─────────────────────────────────────────────────────────────────────────────
+const COLOR_SAME = "#1A202C", COLOR_UP = "#16A34A", COLOR_DOWN = "#DC2626";
+function deltaColor(key, newVal) {
+  const old = state.prev[key];
+  if (old == null || newVal == null) return COLOR_SAME;
+  if (Math.abs(newVal - old) < 1e-9) return COLOR_SAME;
+  return newVal > old ? COLOR_UP : COLOR_DOWN;
+}
+
+function updateEqColors(tVal, l75, D, Gf, m75, CT) {
+  if (!state.showEq) return;
+  const am75 = m75 == null ? null : Math.abs(m75);
+  const items = [
+    { key: "CT", val: CT, fmt: 2, vEl: "eq-v-CT", nEl: "eq-name" },
+    { key: "t", val: tVal, fmt: 1, vEl: "eq-v-t", nEl: "eq-t-name" },
+    { key: "l75", val: l75, fmt: 2, vEl: "eq-v-l75", nEl: "eq-l75-name" },
+    { key: "D", val: D, fmt: 1, vEl: "eq-v-D", nEl: "eq-D-name" },
+    { key: "Gf", val: Gf, fmt: 1, vEl: "eq-v-Gf", nEl: "eq-Gf-name" },
+    { key: "m75", val: am75, fmt: 3, vEl: "eq-v-m75", nEl: "eq-m75-name" },
+  ];
+  for (const it of items) {
+    const c = deltaColor(it.key, it.val);
+    const vEl = document.getElementById(it.vEl);
+    const nEl = document.getElementById(it.nEl);
+    vEl.textContent = it.val == null ? "—" : it.val.toFixed(it.fmt);
+    vEl.style.color = c;
+    if (nEl) nEl.style.color = c;
+    state.prev[it.key] = it.val;
+  }
+}
+
+function toggleEqView() {
+  const eq = document.getElementById("ct-eq");
+  const radios = document.getElementById("radio-wrap");
+  if (state.showEq) {
+    eq.classList.add("visible");
+    radios.classList.add("hidden");
+  } else {
+    eq.classList.remove("visible");
+    radios.classList.remove("hidden");
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cached handle positions (data coordinates)
+// ─────────────────────────────────────────────────────────────────────────────
+const handlePos = {
+  peak:  { x: 4, y: 10 },
+  decay: { x: null, y: null },
+  rise:  { x: null, y: null },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main update
+// ─────────────────────────────────────────────────────────────────────────────
+function update() {
+  const { P, d, nr, nd } = state;
+  const xGrid = linspace(0, Math.max(state.xlim, d * 3), 800);
+  const yGrid = idealCt(xGrid, P, d, nr, nd);
+
+  const x01 = findXatLoad(TARGET_LOAD, P, d, nd);
+  const P75 = 0.75 * P;
+  const l75 = findXatLoad(P75, P, d, nd);
+  const l_rise_75 = findRiseXatLoad(P75, P, d, nr);
+  const m75 = l75 != null ? decaySlope(P, d, nd, l75) : null;
+
+  // Cache handle positions for hit-testing
+  handlePos.peak  = { x: d, y: P };
+  handlePos.decay = { x: l75, y: l75 != null ? P75 : null };
+  handlePos.rise  = { x: l_rise_75, y: l_rise_75 != null ? P75 : null };
+
+  // Fill under curve up to x01
+  let fillX = [], fillY = [];
+  if (x01 != null) {
+    const nFill = 400;
+    fillX = new Array(nFill);
+    fillY = new Array(nFill);
+    for (let i = 0; i < nFill; i++) {
+      const xv = (x01 * i) / (nFill - 1);
+      fillX[i] = xv;
+      fillY[i] = idealCt([xv], P, d, nr, nd)[0];
+    }
+  }
+
+  // m75 tangent line
+  let tanX = [], tanY = [];
+  if (m75 != null && l75 != null && state.showM75) {
+    tanX = [0, state.xlim];
+    tanY = [P75 + m75 * (0 - l75), P75 + m75 * (state.xlim - l75)];
+  }
+
+  const Wf = computeWf(P, d, nr, nd, x01);
+  const Gf = Wf != null ? (Wf / (state.D * state.t)) * 1e6 : null;
+  let CT = null;
+  if (Gf != null && m75 != null && l75 != null && m75 !== 0) {
+    CT = (state.t / 62.0) * (l75 / state.D) * (Gf / Math.abs(m75));
+  }
+
+  // Shapes: reference lines
+  const shapes = [
+    { type: "line", x0: 0, x1: state.xlim, y0: TARGET_LOAD, y1: TARGET_LOAD,
+      line: { color: "#DD6B20", width: 1, dash: "dot" }, opacity: 0.55 },
+    { type: "line", x0: d, x1: d, y0: 0, y1: P,
+      line: { color: "#E53E3E", width: 1, dash: "dash" }, opacity: 0.45 },
+    { type: "line", x0: 0, x1: state.xlim, y0: P75, y1: P75,
+      line: { color: "#805AD5", width: 1, dash: "dash" }, opacity: 0.5 },
+  ];
+  if (l75 != null) {
+    shapes.push({ type: "line", x0: l75, x1: l75, y0: 0, y1: P75,
+      line: { color: "#805AD5", width: 1, dash: "dash" }, opacity: 0.5 });
+  }
+  if (l_rise_75 != null) {
+    shapes.push({ type: "line", x0: l_rise_75, x1: l_rise_75, y0: 0, y1: P75,
+      line: { color: "#2F855A", width: 1, dash: "dash" }, opacity: 0.5 });
+  }
+  if (x01 != null) {
+    shapes.push({ type: "line", x0: x01, x1: x01, y0: 0, y1: TARGET_LOAD,
+      line: { color: "#DD6B20", width: 1, dash: "dot" }, opacity: 0.55 });
+  }
+
+  // ── ASTM D8225 parameters (from raw experimental data) ───────────────
+  let astm = null;
+  if (state.expData && state.expData.x.length) {
+    astm = computeAstmCt(state.expData.x, state.expData.y, state.D, state.t);
+  }
+
+  let astmRegX = [], astmRegY = [];
+  let astmPtsX = [], astmPtsY = [];
+  if (astm) {
+    const lo = Math.min(astm.l65, astm.l85);
+    const hi = Math.max(astm.l65, astm.l85);
+    const pad = hi > lo ? 0.15 * (hi - lo) : 0.2;
+    astmRegX = [lo - pad, hi + pad];
+    astmRegY = astmRegX.map(x => astm.slope * x + astm.intercept);
+    astmPtsX = [astm.l65, astm.l75, astm.l85];
+    astmPtsY = [astm.P65, astm.P75, astm.P85];
+    shapes.push({
+      type: "path",
+      path: `M ${astm.l65},${astm.P65} L ${astm.l85},${astm.P85} `
+          + `L ${astm.l85},${astm.P65} Z`,
+      line: { color: "#C05621", width: 1.2 },
+      fillcolor: "rgba(0,0,0,0)",
+      opacity: 0.9
+    });
+  }
+
+  // Trace order matches initialTraces1 above:
+  // 0 fill, 1 model, 2 exp, 3 peak halo, 4 decay halo, 5 rise halo,
+  // 6 m75 tangent, 7 ASTM reg, 8 ASTM pts,
+  // 9 peak inner, 10 decay inner, 11 rise inner
+  const decayX = l75 != null ? [l75] : [];
+  const decayY = l75 != null ? [P75] : [];
+  const riseX  = l_rise_75 != null ? [l_rise_75] : [];
+  const riseY  = l_rise_75 != null ? [P75] : [];
+
+  Plotly.update("plot1", {
+    x: [
+      fillX,
+      Array.from(xGrid),
+      state.expData ? state.expData.x : [],
+      [d], decayX, riseX,
+      tanX,
+      astmRegX, astmPtsX,
+      [d], decayX, riseX
+    ],
+    y: [
+      fillY,
+      Array.from(yGrid),
+      state.expData ? state.expData.y : [],
+      [P], decayY, riseY,
+      tanY,
+      astmRegY, astmPtsY,
+      [P], decayY, riseY
+    ]
+  }, {
+    "xaxis.range": [0, state.xlim],
+    "yaxis.range": [0, Math.max(state.ylim, 1)],
+    shapes: shapes
+  });
+
+  // SSE
+  let SSE = null;
+  if (state.expData && state.expData.x.length) {
+    const ym = idealCt(state.expData.x, P, d, nr, nd);
+    let s = 0;
+    for (let i = 0; i < ym.length; i++) {
+      const diff = state.expData.y[i] - ym[i];
+      s += diff * diff;
+    }
+    SSE = s;
+  }
+
+  // Info box
+  const fmt = (v, dp, unit = "") => v == null ? "—" : v.toFixed(dp) + unit;
+  const rows = [
+    `── Model ──`,
+    `P     ${fmt(P, 1, " kN").padStart(14)}`,
+    `d     ${fmt(d, 1, " mm").padStart(14)}`,
+    `nr    ${fmt(nr, 2, "").padStart(14)}`,
+    `nd    ${fmt(nd, 2, "").padStart(14)}`,
+    ``,
+    `P75   ${fmt(P75, 2, " kN").padStart(14)}`,
+    `l75   ${fmt(l75, 2, " mm").padStart(14)}`,
+    `m75   ${fmt(m75, 3, " kN/mm").padStart(14)}`,
+    ``,
+    `Wf    ${fmt(Wf, 3, " J").padStart(14)}`,
+    `Gf    ${fmt(Gf, 1, " J/m²").padStart(14)}`,
+    `CT    ${fmt(CT, 2, "").padStart(14)}`,
+  ];
+  if (SSE != null) rows.push("", `SSE   ${fmt(SSE, 3).padStart(14)}`);
+  if (astm) {
+    rows.push("", `── ASTM D8225 ──`);
+    rows.push(`P100  ${fmt(astm.P100, 2, " kN").padStart(14)}`);
+    rows.push(`P75   ${fmt(astm.P75,  2, " kN").padStart(14)}`);
+    rows.push(`l75   ${fmt(astm.l75,  2, " mm").padStart(14)}`);
+    rows.push(`m75   ${fmt(astm.m75,  3, " kN/mm").padStart(14)}`);
+    rows.push(``);
+    rows.push(`Wf    ${fmt(astm.Wf,   3, " J").padStart(14)}`);
+    rows.push(`Gf    ${fmt(astm.Gf,   1, " J/m²").padStart(14)}`);
+    rows.push(`CT    ${fmt(astm.CT,   2, "").padStart(14)}`);
+    rows.push(`R²    ${fmt(astm.r2,   3, "").padStart(14)}`);
+  }
+  document.getElementById("info-box").textContent = rows.join("\n");
+
+  updateEqColors(state.t, l75, state.D, Gf, m75, CT);
+
+  // Parameter space
+  const varDict = {
+    "P": P, "d": d, "P75": P75, "l75": l75,
+    "|m75|": m75 != null ? Math.abs(m75) : null,
+    "Wf": Wf, "Gf": Gf, "CT": CT
+  };
+  const xv = varDict[state.paramX];
+  const yv = varDict[state.paramY];
+  if (xv != null && yv != null) {
+    state.trailX.push(xv);
+    state.trailY.push(yv);
+    if (state.trailX.length > 500) {
+      state.trailX.shift(); state.trailY.shift();
+    }
+  }
+  Plotly.update("plot2", {
+    x: [state.trailX.slice(), xv != null ? [xv] : []],
+    y: [state.trailY.slice(), yv != null ? [yv] : []]
+  }, {
+    "xaxis.title.text": state.paramX,
+    "yaxis.title.text": state.paramY,
+    "xaxis.autorange": true,
+    "yaxis.autorange": true
+  });
+
+  // Variable Springs view (no-op when the view is hidden)
+  updateSprings({
+    CT:  CT,
+    l75: l75,
+    Gf:  Gf,
+    m75: m75 != null ? Math.abs(m75) : null
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Slider sync helpers
+// ─────────────────────────────────────────────────────────────────────────────
+function syncSliderUI() {
+  const ids = [["s-P","v-P","P",1],["s-d","v-d","d",1],
+               ["s-nd","v-nd","nd",1],["s-nr","v-nr","nr",1]];
+  for (const [s, v, k, dp] of ids) {
+    const el = document.getElementById(s);
+    const ve = document.getElementById(v);
+    el.value = state[k];
+    ve.textContent = (+state[k]).toFixed(dp);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Drag interaction on plot1
+// ─────────────────────────────────────────────────────────────────────────────
+const plot1El = document.getElementById("plot1");
+
+// Convert a mouse event to data coordinates. Returns null if the cursor is
+// outside the plotting area.
+function mouseToData(ev) {
+  const fl = plot1El._fullLayout;
+  if (!fl || !fl.xaxis || !fl.yaxis) return null;
+  const xa = fl.xaxis, ya = fl.yaxis;
+  const bb = plot1El.getBoundingClientRect();
+  // Plot area within the plot div, in pixels:
+  const px = ev.clientX - bb.left - xa._offset;
+  const py = ev.clientY - bb.top  - ya._offset;
+  if (px < 0 || px > xa._length || py < 0 || py > ya._length) {
+    return { x: xa.p2d(px), y: ya.p2d(py), inside: false };
+  }
+  return { x: xa.p2d(px), y: ya.p2d(py), inside: true,
+           pxX: ev.clientX - bb.left, pxY: ev.clientY - bb.top };
+}
+
+// Pixel position of a data point (relative to plot div)
+function dataToPixel(xv, yv) {
+  const fl = plot1El._fullLayout;
+  if (!fl || xv == null || yv == null) return null;
+  const xa = fl.xaxis, ya = fl.yaxis;
+  return {
+    px: xa.d2p(xv) + xa._offset,
+    py: ya.d2p(yv) + ya._offset
+  };
+}
+
+const HIT_RADIUS_PX = 18;
+
+function nearestHandle(ev) {
+  const bb = plot1El.getBoundingClientRect();
+  const mx = ev.clientX - bb.left;
+  const my = ev.clientY - bb.top;
+  const candidates = [];
+  for (const which of ["peak", "decay", "rise"]) {
+    const p = handlePos[which];
+    if (p == null || p.x == null || p.y == null) continue;
+    const px = dataToPixel(p.x, p.y);
+    if (!px) continue;
+    const dx = px.px - mx, dy = px.py - my;
+    const r = Math.hypot(dx, dy);
+    if (r <= HIT_RADIUS_PX) candidates.push({ which, r });
+  }
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => a.r - b.r);
+  return candidates[0].which;
+}
+
+function setCursor(c) { plot1El.style.cursor = c; }
+
+plot1El.addEventListener("mousemove", (ev) => {
+  if (state.drag) return;     // cursor handled in drag handler
+  const which = nearestHandle(ev);
+  state.hoverHandle = which;
+  setCursor(which ? "grab" : "default");
+});
+
+plot1El.addEventListener("mouseleave", () => {
+  if (!state.drag) setCursor("default");
+});
+
+plot1El.addEventListener("mousedown", (ev) => {
+  if (ev.button !== 0) return;
+  const which = nearestHandle(ev);
+  if (!which) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  state.drag = { which };
+  setCursor("grabbing");
+  // Capture global mouse so dragging continues outside the plot rect
+  document.addEventListener("mousemove", onDocMouseMove);
+  document.addEventListener("mouseup", onDocMouseUp);
+}, true);
+
+function onDocMouseMove(ev) {
+  if (!state.drag) return;
+  ev.preventDefault();
+  const fl = plot1El._fullLayout;
+  if (!fl) return;
+  const xa = fl.xaxis, ya = fl.yaxis;
+  const bb = plot1El.getBoundingClientRect();
+  const px = ev.clientX - bb.left - xa._offset;
+  const py = ev.clientY - bb.top  - ya._offset;
+  // Clamp to plot area so the user can't drag a point off-axis
+  const pxC = Math.min(Math.max(px, 0), xa._length);
+  const pyC = Math.min(Math.max(py, 0), ya._length);
+  const xData = xa.p2d(pxC);
+  const yData = ya.p2d(pyC);
+
+  const which = state.drag.which;
+
+  if (which === "peak") {
+    // Drag freely in (x, y) → (d, P)
+    const newD = clampB(xData, "d");
+    const newP = clampB(yData, "P");
+    state.d = Math.round(newD * 100) / 100;
+    state.P = Math.round(newP * 100) / 100;
+  }
+  else if (which === "decay") {
+    // (x, y=0.75·P).  Allow vertical drag → also adjust P (so y stays = 0.75·P).
+    // Horizontal drag changes l75 → recompute n_d.
+    const newP_y = yData / 0.75;
+    if (isFinite(newP_y) && newP_y > 0) {
+      state.P = clampB(Math.round(newP_y * 100) / 100, "P");
+    }
+    // Now derive nd from new x position
+    const dVal = state.d;
+    const xMin = dVal * 1.001;
+    const xCl = Math.max(xData, xMin);
+    const r = xCl / dVal;          // > 1
+    const n = exponentFromRatio(r);
+    if (n != null) {
+      state.nd = Math.round(clampB(n, "nd") * 100) / 100;
+    }
+  }
+  else if (which === "rise") {
+    // (x, y=0.75·P).  Allow vertical drag → P, horizontal → n_r.
+    const newP_y = yData / 0.75;
+    if (isFinite(newP_y) && newP_y > 0) {
+      state.P = clampB(Math.round(newP_y * 100) / 100, "P");
+    }
+    const dVal = state.d;
+    const xMax = dVal * 0.999;
+    const xCl  = Math.min(Math.max(xData, 1e-4), xMax);
+    const r = xCl / dVal;          // < 1
+    const n = exponentFromRatio(r);
+    if (n != null) {
+      state.nr = Math.round(clampB(n, "nr") * 100) / 100;
+    }
+  }
+
+  syncSliderUI();
+  update();
+}
+
+function onDocMouseUp() {
+  if (!state.drag) return;
+  state.drag = null;
+  setCursor(state.hoverHandle ? "grab" : "default");
+  document.removeEventListener("mousemove", onDocMouseMove);
+  document.removeEventListener("mouseup", onDocMouseUp);
+}
+
+// Touch support — mirror mouse behavior for tablets
+plot1El.addEventListener("touchstart", (ev) => {
+  if (ev.touches.length !== 1) return;
+  const t = ev.touches[0];
+  const fakeEv = { button: 0, clientX: t.clientX, clientY: t.clientY,
+                   preventDefault: () => ev.preventDefault(),
+                   stopPropagation: () => ev.stopPropagation() };
+  const which = nearestHandle(fakeEv);
+  if (!which) return;
+  ev.preventDefault();
+  state.drag = { which };
+  setCursor("grabbing");
+  document.addEventListener("touchmove", onDocTouchMove, { passive: false });
+  document.addEventListener("touchend", onDocTouchEnd);
+}, { passive: false });
+
+function onDocTouchMove(ev) {
+  if (!state.drag || ev.touches.length !== 1) return;
+  const t = ev.touches[0];
+  ev.preventDefault();
+  onDocMouseMove({ clientX: t.clientX, clientY: t.clientY,
+                   preventDefault: () => {} });
+}
+function onDocTouchEnd() {
+  onDocMouseUp();
+  document.removeEventListener("touchmove", onDocTouchMove);
+  document.removeEventListener("touchend", onDocTouchEnd);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Slider wiring (kept fully functional alongside dragging)
+// ─────────────────────────────────────────────────────────────────────────────
+function bindSlider(id, key, dp) {
+  const el = document.getElementById(id);
+  const valEl = document.getElementById("v-" + id.slice(2));
+  el.addEventListener("input", () => {
+    state[key] = parseFloat(el.value);
+    valEl.textContent = state[key].toFixed(dp);
+    update();
+  });
+  valEl.textContent = parseFloat(el.value).toFixed(dp);
+}
+bindSlider("s-P", "P", 1);
+bindSlider("s-d", "d", 1);
+bindSlider("s-nd", "nd", 1);
+bindSlider("s-nr", "nr", 1);
+bindSlider("s-xlim", "xlim", 0);
+bindSlider("s-ylim", "ylim", 1);
+
+document.getElementById("in-D").addEventListener("input", e => {
+  const v = parseFloat(e.target.value);
+  if (!isNaN(v)) { state.D = v; update(); }
+});
+document.getElementById("in-t").addEventListener("input", e => {
+  const v = parseFloat(e.target.value);
+  if (!isNaN(v)) { state.t = v; update(); }
+});
+
+document.getElementById("chk-m75").addEventListener("change", e => {
+  state.showM75 = e.target.checked;
+  update();
+});
+document.getElementById("chk-eq").addEventListener("change", e => {
+  state.showEq = e.target.checked;
+  toggleEqView();
+  update();
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Import flow — ask user which sheet + columns hold Load / Displacement
+// ─────────────────────────────────────────────────────────────────────────────
+function promptImportOptions(sheetNames, filename) {
+  return new Promise((resolve) => {
+    const modal    = document.getElementById("import-modal");
+    const sheetSel = document.getElementById("mod-sheet");
+    const loadIn   = document.getElementById("mod-load");
+    const dispIn   = document.getElementById("mod-disp");
+    const fnEl     = document.getElementById("mod-filename");
+    const okBtn    = document.getElementById("mod-ok");
+    const cancelBtn= document.getElementById("mod-cancel");
+
+    sheetSel.innerHTML = "";
+    for (const s of sheetNames) {
+      const opt = document.createElement("option");
+      opt.value = s; opt.textContent = s;
+      sheetSel.appendChild(opt);
+    }
+    sheetSel.disabled = sheetNames.length <= 1;
+    sheetSel.selectedIndex = 0;
+
+    loadIn.value = "A";
+    dispIn.value = "B";
+    fnEl.textContent = filename || "";
+    modal.classList.add("visible");
+    setTimeout(() => sheetSel.focus(), 0);
+
+    function cleanup() {
+      modal.classList.remove("visible");
+      okBtn.onclick = null;
+      cancelBtn.onclick = null;
+      modal.onclick = null;
+      document.removeEventListener("keydown", onKey);
+    }
+    function finish(result) { cleanup(); resolve(result); }
+    function onKey(ev) {
+      if (ev.key === "Enter")  { ev.preventDefault(); okBtn.click(); }
+      if (ev.key === "Escape") { ev.preventDefault(); cancelBtn.click(); }
+    }
+
+    okBtn.onclick = () => {
+      let loadCol, dispCol;
+      try {
+        loadCol = (loadIn.value.trim().toUpperCase() || "A");
+        dispCol = (dispIn.value.trim().toUpperCase() || "B");
+        colLetterToIndex(loadCol);
+        colLetterToIndex(dispCol);
+      } catch (err) {
+        alert("Invalid column letter — use A, B, ..., AA, AB, ...");
+        return;
+      }
+      finish({ sheet: sheetSel.value, loadCol, dispCol });
+    };
+    cancelBtn.onclick = () => finish(null);
+    modal.onclick = (ev) => { if (ev.target === modal) finish(null); };
+    document.addEventListener("keydown", onKey);
+  });
+}
+
+// File import
+document.getElementById("btn-import").addEventListener("click", () => {
+  document.getElementById("file-input").click();
+});
+document.getElementById("file-input").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  try {
+    const buf = await file.arrayBuffer();
+
+    const sheets = {};
+    let sheetNames = [];
+    if (file.name.toLowerCase().endsWith(".csv")) {
+      const text = new TextDecoder().decode(buf);
+      const rows = text.trim().split(/\r?\n/)
+                       .map(line => line.split(/[,;\t]/).map(v => v.trim()));
+      sheetNames = ["(csv)"];
+      sheets["(csv)"] = rows;
+    } else {
+      const wb = XLSX.read(buf, { type: "array" });
+      sheetNames = wb.SheetNames;
+      for (const n of sheetNames) {
+        sheets[n] = XLSX.utils.sheet_to_json(wb.Sheets[n],
+                                              { header: 1, raw: true });
+      }
+    }
+    if (!sheetNames.length) {
+      alert("The workbook has no sheets.");
+      return;
+    }
+
+    const opts = await promptImportOptions(sheetNames, file.name);
+    if (!opts) return;
+
+    const rows = sheets[opts.sheet];
+    let parsed;
+    try {
+      parsed = readSheetByColumns(rows, opts.loadCol, opts.dispCol);
+    } catch (err) {
+      alert(err.message);
+      return;
+    }
+    if (!parsed.loads.length) {
+      alert(`No numeric rows found in columns `
+          + `${opts.loadCol} / ${opts.dispCol} of sheet "${opts.sheet}".`);
+      return;
+    }
+    state.expData     = { x: parsed.disps, y: parsed.loads };
+    state.expFilename = file.name;
+    state.expSheet    = opts.sheet;
+    state.expLoadCol  = opts.loadCol;
+    state.expDispCol  = opts.dispCol;
+    update();
+  } catch (err) {
+    alert("Error reading file: " + err.message);
+  }
+});
+
+document.getElementById("btn-clear").addEventListener("click", () => {
+  state.expData     = null;
+  state.expFilename = null;
+  state.expSheet    = null;
+  state.expLoadCol  = null;
+  state.expDispCol  = null;
+  update();
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Save report — standalone printable HTML file
+// ─────────────────────────────────────────────────────────────────────────────
+function _escHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c =>
+    ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+}
+function _safeFilename(s) {
+  return String(s || "").trim().replace(/\s+/g, "_").replace(/[^\w.\-]/g, "") || "unnamed";
+}
+
+async function generateReport() {
+  const project  = (document.getElementById("rep-project").value  || "").trim()
+                 || "(unspecified)";
+  const specimen = (document.getElementById("rep-specimen").value || "").trim()
+                 || "(unspecified)";
+  const ts = new Date().toLocaleString();
+
+  let plotImg = "";
+  try {
+    plotImg = await Plotly.toImage("plot1",
+      { format: "png", width: 1200, height: 700, scale: 2 });
+  } catch (err) {
+    console.warn("Plot snapshot failed:", err);
+  }
+
+  const { P, d, nr, nd, D, t, expData } = state;
+  const x01 = findXatLoad(TARGET_LOAD, P, d, nd);
+  const P75 = 0.75 * P;
+  const l75 = findXatLoad(P75, P, d, nd);
+  const m75 = l75 != null ? decaySlope(P, d, nd, l75) : null;
+  const Wf  = computeWf(P, d, nr, nd, x01);
+  const Gf  = Wf != null ? (Wf / (D * t)) * 1e6 : null;
+  let CT_model = null;
+  if (Gf != null && m75 != null && l75 != null && m75 !== 0) {
+    CT_model = (t / 62.0) * (l75 / D) * (Gf / Math.abs(m75));
+  }
+  let SSE = null;
+  if (expData && expData.x.length) {
+    const ym = idealCt(expData.x, P, d, nr, nd);
+    let s = 0;
+    for (let i = 0; i < ym.length; i++) {
+      const diff = expData.y[i] - ym[i]; s += diff * diff;
+    }
+    SSE = s;
+  }
+  const astm = expData ? computeAstmCt(expData.x, expData.y, D, t) : null;
+
+  const fmt = (v, dp, unit = "") =>
+    v == null ? "&mdash;" : _escHtml(v.toFixed(dp) + unit);
+
+  const sourceInfo = state.expFilename
+    ? `${state.expFilename}  (sheet: ${state.expSheet}, `
+      + `Load=${state.expLoadCol}, Disp=${state.expDispCol}, `
+      + `${expData.x.length} rows)`
+    : "— no experimental data loaded —";
+
+  const rowHtml = (rows) => rows.map(([k, v]) =>
+    `<tr><th>${k}</th><td>${v}</td></tr>`).join("");
+
+  const modelRows = [
+    ["P (peak load)",       fmt(P,  2, " kN")],
+    ["d (peak disp.)",      fmt(d,  2, " mm")],
+    ["n<sub>r</sub> (rise)",fmt(nr, 2)],
+    ["n<sub>d</sub> (decay)",fmt(nd, 2)],
+    ["P<sub>75</sub>",      fmt(P75, 3, " kN")],
+    ["l<sub>75</sub>",      fmt(l75, 3, " mm")],
+    ["m<sub>75</sub>",      fmt(m75, 4, " kN/mm")],
+    ["W<sub>f</sub>",       fmt(Wf,  3, " J")],
+    ["G<sub>f</sub>",       fmt(Gf,  2, " J/m²")],
+    ["CT<sub>index</sub>",  fmt(CT_model, 3)],
+    ["SSE vs. experimental",fmt(SSE, 4)]
+  ];
+
+  const astmRows = astm ? [
+    ["P<sub>100</sub>",     fmt(astm.P100, 3, " kN")],
+    ["P<sub>85</sub>",      fmt(astm.P85,  3, " kN")],
+    ["P<sub>75</sub>",      fmt(astm.P75,  3, " kN")],
+    ["P<sub>65</sub>",      fmt(astm.P65,  3, " kN")],
+    ["l<sub>85</sub>",      fmt(astm.l85,  3, " mm")],
+    ["l<sub>75</sub>",      fmt(astm.l75,  3, " mm")],
+    ["l<sub>65</sub>",      fmt(astm.l65,  3, " mm")],
+    ["|m<sub>75</sub>|",    fmt(astm.m75,  4, " kN/mm")],
+    ["slope (regression)",  fmt(astm.slope, 4, " kN/mm")],
+    ["intercept",           fmt(astm.intercept, 4, " kN")],
+    ["W<sub>f</sub>",       fmt(astm.Wf,   3, " J")],
+    ["G<sub>f</sub>",       fmt(astm.Gf,   2, " J/m²")],
+    ["CT<sub>index</sub>",  fmt(astm.CT,   3)],
+    ["R²",                  fmt(astm.r2,   4)]
+  ] : [];
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>IDEAL-CT Report — ${_escHtml(specimen)}</title>
+<style>
+  :root { --curve:#2B6CB0; --astm:#C05621; --border:#CBD5E0;
+          --label:#4A5568; --muted:#718096; }
+  @page { margin: 18mm; }
+  body {
+    font-family: 'Source Serif 4', Georgia, serif;
+    color: #1A202C;
+    margin: 38px auto;
+    max-width: 900px;
+    padding: 0 24px;
+    line-height: 1.45;
+  }
+  h1 {
+    font-size: 22px; font-weight: 600; margin: 0 0 4px;
+    border-bottom: 2px solid var(--curve); padding-bottom: 6px;
+  }
+  h2 {
+    font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--label); margin: 22px 0 6px;
+    border-bottom: 1px solid var(--border); padding-bottom: 3px;
+  }
+  .meta {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 12px; color: var(--muted); margin: 2px 0 14px;
+  }
+  .meta b { color: #1A202C; font-weight: 600; }
+  table {
+    width: 100%; border-collapse: collapse; margin-top: 4px;
+    font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+    font-size: 12px;
+  }
+  th, td {
+    text-align: left; padding: 4px 8px;
+    border-bottom: 1px solid #EDF2F7;
+  }
+  th { width: 45%; color: var(--label); font-weight: 600; font-family: 'Source Serif 4', serif; }
+  td { text-align: right; }
+  .two-col {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 28px;
+  }
+  .astm-empty {
+    color: var(--muted); font-style: italic; font-size: 12px;
+    padding: 10px 0;
+  }
+  .plot { margin: 16px 0 4px; text-align: center; }
+  .plot img {
+    max-width: 100%; height: auto;
+    border: 1px solid var(--border); border-radius: 4px;
+  }
+  footer {
+    margin-top: 32px; font-size: 10.5px; color: #A0AEC0;
+    font-style: italic; text-align: right;
+  }
+  .note {
+    font-size: 11px; color: var(--muted); font-style: italic;
+    margin-top: 4px;
+  }
+  @media print {
+    body { margin: 0 auto; }
+    h2 { page-break-after: avoid; }
+    .two-col { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<h1>IDEAL-CT Analysis Report</h1>
+<div class="meta">
+  <span>Project: <b>${_escHtml(project)}</b>
+        &nbsp;·&nbsp; Specimen: <b>${_escHtml(specimen)}</b></span>
+  <span>${_escHtml(ts)}</span>
+</div>
+
+<h2>Inputs</h2>
+<table>
+  <tr><th>Specimen diameter, D</th><td>${fmt(D, 2, " mm")}</td></tr>
+  <tr><th>Specimen thickness, t</th><td>${fmt(t, 2, " mm")}</td></tr>
+  <tr><th>Data source</th><td>${_escHtml(sourceInfo)}</td></tr>
+</table>
+
+<div class="two-col">
+  <div>
+    <h2>Model — piecewise Gamma fit</h2>
+    <table>${rowHtml(modelRows)}</table>
+    <div class="note">CT<sub>index</sub> uses m<sub>75</sub> in kN/mm
+      (same convention as ASTM with m<sub>75</sub> in N/m × 10<sup>6</sup>).</div>
+  </div>
+  <div>
+    <h2>ASTM D8225 — direct curve analysis</h2>
+    ${astm ? `<table>${rowHtml(astmRows)}</table>`
+           : `<div class="astm-empty">No experimental data loaded — ASTM parameters are not computed.</div>`}
+  </div>
+</div>
+
+${plotImg
+    ? `<h2>Load – Displacement plot</h2>
+       <div class="plot"><img src="${plotImg}" alt="Load vs Displacement"></div>`
+    : ""}
+
+<footer>
+  Generated by IDEAL-CT Curve Explorer (Interactive) &nbsp;·&nbsp;
+  Dr. Elvis A. Castillo-Camarena &nbsp;·&nbsp; Universidad Tecnológica de Panamá (UTP)
+  &nbsp;·&nbsp; CC BY 4.0
+</footer>
+
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
+  a.download = `IDEAL-CT_Report_${_safeFilename(project)}_${_safeFilename(specimen)}.html`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 200);
+}
+
+document.getElementById("btn-report").addEventListener("click", () => {
+  generateReport().catch(err => alert("Report generation failed: " + err.message));
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Optimize — Nelder-Mead on SSE
+// ─────────────────────────────────────────────────────────────────────────────
+function nelderMead(f, x0, opts = {}) {
+  const n = x0.length;
+  const alpha = 1, gamma = 2, rho = 0.5, sigma = 0.5;
+  const maxIter = opts.maxIter || 400;
+  const tol = opts.tol || 1e-7;
+  const bounds = opts.bounds || null;
+
+  const clamp = (p) => bounds ? p.map((v, i) => Math.min(Math.max(v, bounds[i][0]), bounds[i][1])) : p;
+
+  const simplex = [x0.slice()];
+  for (let i = 0; i < n; i++) {
+    const pt = x0.slice();
+    pt[i] = pt[i] + (Math.abs(pt[i]) * 0.05 || 0.05);
+    simplex.push(clamp(pt));
+  }
+  let fvals = simplex.map(p => f(p));
+
+  for (let iter = 0; iter < maxIter; iter++) {
+    const order = fvals.map((v, i) => i).sort((a, b) => fvals[a] - fvals[b]);
+    const sorted = order.map(i => simplex[i]);
+    const fsorted = order.map(i => fvals[i]);
+    for (let i = 0; i < simplex.length; i++) { simplex[i] = sorted[i]; fvals[i] = fsorted[i]; }
+
+    const spread = Math.max(...fvals) - Math.min(...fvals);
+    if (spread < tol) break;
+
+    const centroid = new Array(n).fill(0);
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) centroid[j] += simplex[i][j];
+    }
+    for (let j = 0; j < n; j++) centroid[j] /= n;
+
+    const worst = simplex[n];
+    const xr = clamp(centroid.map((c, j) => c + alpha * (c - worst[j])));
+    const fr = f(xr);
+    if (fr >= fvals[0] && fr < fvals[n - 1]) {
+      simplex[n] = xr; fvals[n] = fr; continue;
+    }
+    if (fr < fvals[0]) {
+      const xe = clamp(centroid.map((c, j) => c + gamma * (xr[j] - c)));
+      const fe = f(xe);
+      if (fe < fr) { simplex[n] = xe; fvals[n] = fe; }
+      else { simplex[n] = xr; fvals[n] = fr; }
+      continue;
+    }
+    const xc = clamp(centroid.map((c, j) => c + rho * (worst[j] - c)));
+    const fc = f(xc);
+    if (fc < fvals[n]) { simplex[n] = xc; fvals[n] = fc; continue; }
+    for (let i = 1; i <= n; i++) {
+      simplex[i] = clamp(simplex[0].map((v, j) => v + sigma * (simplex[i][j] - v)));
+      fvals[i] = f(simplex[i]);
+    }
+  }
+  const order = fvals.map((v, i) => i).sort((a, b) => fvals[a] - fvals[b]);
+  return { x: simplex[order[0]], fun: fvals[order[0]] };
+}
+
+document.getElementById("btn-optimize").addEventListener("click", () => {
+  if (!state.expData || state.expData.x.length === 0) {
+    alert("No experimental data loaded — import a file first.");
+    return;
+  }
+  const xd = state.expData.x;
+  const yd = state.expData.y;
+  const objective = (params) => {
+    const [P, d, nd, nr] = params;
+    const ym = idealCt(xd, P, d, nr, nd);
+    let s = 0;
+    for (let i = 0; i < ym.length; i++) {
+      const diff = yd[i] - ym[i];
+      s += diff * diff;
+    }
+    return s;
+  };
+  const bounds = [[0.5, 30], [0.5, 15], [0.1, 30], [0.5, 15]];
+  const res = nelderMead(objective, [state.P, state.d, state.nd, state.nr],
+                         { bounds, maxIter: 600 });
+  const [P, d, nd, nr] = res.x;
+  state.P = Math.round(P * 10) / 10;
+  state.d = Math.round(d * 10) / 10;
+  state.nd = Math.round(nd * 10) / 10;
+  state.nr = Math.round(nr * 10) / 10;
+  syncSliderUI();
+  update();
+});
+
+// Kick off
+update();
+</script>
+</body>
+</html>

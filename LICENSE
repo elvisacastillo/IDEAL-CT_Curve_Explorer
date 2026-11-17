@@ -1,0 +1,51 @@
+IDEAL-CT Curve Explorer
+Copyright (c) 2026 Elvis A. Castillo-Camarena and Universidad Tecnológica de Panamá (UTP)
+
+This work is licensed under the Creative Commons Attribution 4.0 International
+License (CC BY 4.0).
+
+You are free to:
+
+  - Share: copy and redistribute the material in any medium or format,
+    for any purpose, even commercially.
+  - Adapt: remix, transform, and build upon the material for any purpose,
+    even commercially.
+
+Under the following terms:
+
+  - Attribution: you must give appropriate credit to the authors of the
+    application, Dr. Elvis A. Castillo-Camarena and the Universidad
+    Tecnológica de Panamá (UTP), provide a link to the license, and indicate
+    if changes were made. You may do so in any reasonable manner, but not in
+    any way that suggests the licensors endorse you or your use.
+  - No additional restrictions: you may not apply legal terms or technological
+    measures that legally restrict others from doing anything the license
+    permits.
+
+Suggested credit line:
+
+  IDEAL-CT Curve Explorer — Dr. Elvis A. Castillo-Camarena, Universidad
+  Tecnológica de Panamá (UTP). Licensed under CC BY 4.0.
+
+Summary of the license:  https://creativecommons.org/licenses/by/4.0/
+Full legal code:         https://creativecommons.org/licenses/by/4.0/legalcode
+
+Disclaimer: the application is provided "as is", without warranties of any
+kind, as set out in Section 5 of the legal code. Results are intended for
+teaching, research and analysis; the standard ASTM D8225 procedure remains the
+reference for acceptance testing.
+
+Third-party components: the application loads Plotly.js (MIT License) and
+SheetJS Community Edition (Apache License 2.0) from public CDNs. These
+components are not part of this work and remain under their own licenses.
+
+---
+
+Licencia (resumen en español)
+
+Esta obra está bajo la licencia Creative Commons Atribución 4.0 Internacional
+(CC BY 4.0). Puede usarse, compartirse y adaptarse con cualquier propósito,
+incluso comercial, siempre que se dé crédito a los autores de la aplicación,
+el Dr. Elvis A. Castillo-Camarena y la Universidad Tecnológica de Panamá (UTP),
+se incluya un enlace a la licencia y se indique si se realizaron cambios.
+Texto legal completo: https://creativecommons.org/licenses/by/4.0/legalcode.es
